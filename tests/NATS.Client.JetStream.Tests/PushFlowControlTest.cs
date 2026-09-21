@@ -22,7 +22,7 @@ public class PushFlowControlTest(NatsServerFixture server)
             new NatsJSPushConsumerOpts
             {
                 Name = $"{prefix}c1",
-                DeliverSubject = nats.NewInbox(),
+                DeliverSubject = js.NewBaseInbox(),
                 FlowControl = true,
                 IdleHeartbeat = TimeSpan.FromSeconds(5),
             },

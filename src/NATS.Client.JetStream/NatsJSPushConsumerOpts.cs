@@ -39,6 +39,13 @@ public record NatsJSPushConsumerOpts
     /// <see cref="NatsJSException"/> when it's not set. Callers typically pass an inbox
     /// generated with <see cref="INatsJSContext.NewBaseInbox"/>.
     /// </summary>
+    /// <remarks>
+    /// Do not pass <see cref="NatsConnection.NewInbox()"/>. It returns a subject underneath the
+    /// connection's request-reply inbox prefix, which the reply multiplexer is already
+    /// subscribed to, so no messages reach the consumer and nothing is logged. This differs
+    /// from the Go client, where <c>nc.NewInbox()</c> is a valid deliver subject; the .NET
+    /// equivalent of that call is <see cref="INatsJSContext.NewBaseInbox"/>.
+    /// </remarks>
     public string? DeliverSubject { get; init; }
 
     /// <summary>

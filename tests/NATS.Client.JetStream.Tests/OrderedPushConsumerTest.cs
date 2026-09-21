@@ -422,4 +422,29 @@ public class OrderedPushConsumerTest(NatsServerFixture server)
         for (var i = 0; i < 20; i++)
             Assert.Contains(i, snapshot);
     }
+
+    [Fact]
+    public async Task Consume_surfaces_consumer_create_failure()
+    {
+        await using var nats = server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+
+        // The stream does not exist: the consumer creation kicked off by
+        // ConsumeAsync must surface to the caller instead of leaving the
+        // enumerator hanging until cancellation.
+        var consumer = (NatsJSOrderedPushConsumer)await js.CreateOrderedPushConsumerAsync($"{prefix}missing", cancellationToken: cts.Token);
+
+        var e = await Assert.ThrowsAsync<NatsJSApiException>(async () =>
+        {
+            await foreach (var unused in consumer.ConsumeAsync<int>(cancellationToken: cts.Token))
+            {
+            }
+        });
+
+        Assert.Contains("stream not found", e.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }

@@ -642,4 +642,120 @@ public class PushConsumerTest(NatsServerFixture server)
         await Task.WhenAny(consumeTask, Task.Delay(TimeSpan.FromSeconds(5)));
         Assert.True(Volatile.Read(ref timeouts) >= 2);
     }
+
+    [Fact]
+    public async Task Push_consume_no_timeout_notification_without_idle_heartbeat()
+    {
+        await using var nats = server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        var consumer = await js.CreatePushConsumerAsync(
+            $"{prefix}s1",
+            new NatsJSPushConsumerOpts
+            {
+                Name = $"{prefix}c1",
+                DeliverSubject = js.NewBaseInbox(),
+
+                // No IdleHeartbeat: the server sends no heartbeats and the client
+                // must not arm the heartbeat timer nor emit timeout notifications.
+            },
+            cts.Token);
+
+        var timeouts = 0;
+        var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        var consumeOpts = new NatsJSConsumeOpts
+        {
+            NotificationHandler = (notification, _) =>
+            {
+                if (notification is NatsJSTimeoutNotification)
+                    Interlocked.Increment(ref timeouts);
+                return Task.CompletedTask;
+            },
+        };
+
+        var consumeTask = Task.Run(async () =>
+        {
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: consumeOpts, cancellationToken: consumeCts.Token))
+            {
+                _ = msg;
+            }
+        });
+
+        // Nothing is published and the server sends no heartbeats. Wait longer than
+        // the 10s timeout a wrongly armed default (2x5s) timer would produce.
+        await Task.Delay(TimeSpan.FromSeconds(13), cts.Token);
+        Assert.Equal(0, Volatile.Read(ref timeouts));
+
+        consumeCts.Cancel();
+        await Task.WhenAny(consumeTask, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.Equal(0, Volatile.Read(ref timeouts));
+    }
+
+    [Fact]
+    public async Task Push_consume_unhandled_control_message_notified()
+    {
+        var proxy = new NatsProxy(server.Port);
+        await using var nats = new NatsConnection(new NatsOpts { Url = $"nats://127.0.0.1:{proxy.Port}", ConnectTimeout = TimeSpan.FromSeconds(10) });
+        await nats.ConnectRetryAsync();
+        var prefix = server.GetNextId();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        var consumer = await js.CreatePushConsumerAsync(
+            $"{prefix}s1",
+            new NatsJSPushConsumerOpts
+            {
+                Name = $"{prefix}c1",
+                DeliverSubject = js.NewBaseInbox(),
+                IdleHeartbeat = TimeSpan.FromSeconds(1),
+            },
+            cts.Token);
+
+        var notified = 0;
+        var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        var consumeOpts = new NatsJSConsumeOpts
+        {
+            NotificationHandler = (notification, _) =>
+            {
+                if (notification is NatsJSProtocolNotification { HeaderCode: 409, HeaderMessageText: "Idle Heartbeat" })
+                    Interlocked.Increment(ref notified);
+                return Task.CompletedTask;
+            },
+        };
+
+        var consumeTask = Task.Run(async () =>
+        {
+            await foreach (var msg in consumer.ConsumeAsync<int>(opts: consumeOpts, cancellationToken: consumeCts.Token))
+            {
+                _ = msg;
+            }
+        });
+
+        // Let the consumer subscribe, then rewrite idle heartbeats into a non-terminal
+        // 409 control message like the one the server sends on shutdown or leadership
+        // change: it must reach the notification handler, not be swallowed by a log.
+        // Only the status code is rewritten so the frame lengths stay valid.
+        await Task.Delay(1_000, cts.Token);
+        proxy.ServerInterceptors.Add(m => m?.Contains("Idle Heartbeat") ?? false
+            ? m.Replace("NATS/1.0 100", "NATS/1.0 409")
+            : m);
+
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (Volatile.Read(ref notified) < 1)
+        {
+            Assert.True(DateTime.UtcNow < deadline, $"timed out waiting for the protocol notification, got {notified}");
+            await Task.Delay(100, cts.Token);
+        }
+
+        consumeCts.Cancel();
+        await Task.WhenAny(consumeTask, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.True(Volatile.Read(ref notified) >= 1);
+    }
 }
