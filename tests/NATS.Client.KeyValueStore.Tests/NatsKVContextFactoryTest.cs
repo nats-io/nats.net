@@ -1,4 +1,3 @@
-using NATS.Client.Core.Tests;
 using NATS.Client.JetStream.Models;
 using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
@@ -50,6 +49,14 @@ public class NatsKVContextFactoryTest
         public NatsJSOpts Opts { get; } = new(new NatsOpts());
 
         public ValueTask<INatsJSConsumer> CreateOrderedConsumerAsync(string stream, NatsJSOrderedConsumerOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask<INatsJSPushConsumer> CreatePushConsumerAsync(string stream, NatsJSPushConsumerOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask<INatsJSPushConsumer> CreateOrUpdatePushConsumerAsync(string stream, NatsJSPushConsumerOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask<INatsJSPushConsumer> GetPushConsumerAsync(string stream, string consumer, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+        public ValueTask<INatsJSPushConsumer> CreateOrderedPushConsumerAsync(string stream, NatsJSOrderedConsumerOpts? opts = default, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public ValueTask<INatsJSConsumer> CreateOrUpdateConsumerAsync(string stream, ConsumerConfig config, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 

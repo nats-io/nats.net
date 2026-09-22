@@ -87,7 +87,18 @@ public record NatsKVDeleteOpts
 
 public record NatsKVPurgeOpts
 {
-    public static readonly NatsKVPurgeOpts Default = new() { DeleteMarkersThreshold = TimeSpan.FromMinutes(30) };
+    public static readonly NatsKVPurgeOpts Default = new()
+    {
+        DeleteMarkersThreshold = TimeSpan.FromMinutes(30),
+        RetainRecentlyDeletedKeyHistory = false,
+    };
 
     public TimeSpan DeleteMarkersThreshold { get; init; }
+
+    /// <summary>
+    /// Whether or not to retain the history of keys deleted within <see cref="DeleteMarkersThreshold"/>.
+    /// If true, those keys will not be touched; if false, their versions prior to their latest delete marker will be purged.
+    /// Has no effect if <see cref="DeleteMarkersThreshold"/> is zero.
+    /// </summary>
+    public bool RetainRecentlyDeletedKeyHistory { get; init; }
 }

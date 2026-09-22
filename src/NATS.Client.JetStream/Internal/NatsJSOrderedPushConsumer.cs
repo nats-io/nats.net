@@ -34,7 +34,10 @@ internal record NatsJSOrderedPushConsumerOpts
     /// <summary>
     /// Idle heartbeat interval
     /// </summary>
-    public TimeSpan IdleHeartbeat { get; init; } = TimeSpan.FromSeconds(5);
+    /// <remarks>
+    /// When not set, the server does not send heartbeats.
+    /// </remarks>
+    public TimeSpan? IdleHeartbeat { get; init; } = TimeSpan.FromSeconds(5);
 
     public ConsumerConfigDeliverPolicy DeliverPolicy { get; init; } = ConsumerConfigDeliverPolicy.All;
 
@@ -45,6 +48,50 @@ internal record NatsJSOrderedPushConsumerOpts
     /// If the server is slow or unresponsive, disposal will not block longer than this.
     /// </summary>
     public TimeSpan CleanupTimeout { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// A duration instructing the server to clean up the consumer once the deliver subject
+    /// has no interest for that amount of time. This protects ordered consumers from being
+    /// deleted by the server during reconnects that last longer than the server's default
+    /// 5 second threshold for ephemeral consumers.
+    /// </summary>
+    public TimeSpan InactiveThreshold { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// A single subject to filter the consumer by.
+    /// </summary>
+    public string? FilterSubject { get; init; }
+
+    /// <summary>
+    /// Multiple subjects to filter the consumer by.
+    /// </summary>
+    public string[]? FilterSubjects { get; init; }
+
+    /// <summary>
+    /// Start sequence for the consumer.
+    /// </summary>
+    public ulong OptStartSeq { get; init; }
+
+    /// <summary>
+    /// Start time for the consumer.
+    /// </summary>
+    public DateTimeOffset OptStartTime { get; init; }
+
+    /// <summary>
+    /// Replay policy for the consumer.
+    /// </summary>
+    public ConsumerConfigReplayPolicy ReplayPolicy { get; init; } = ConsumerConfigReplayPolicy.Instant;
+
+    /// <summary>
+    /// A handler function invoked for notifications related to consumption.
+    /// </summary>
+    public Func<INatsJSNotification, CancellationToken, Task>? NotificationHandler { get; init; }
+
+    /// <summary>
+    /// A callback invoked with the <see cref="ConsumerInfo"/> of the consumer after it is created
+    /// (both for the initial creation and every recreation).
+    /// </summary>
+    public Action<ConsumerInfo>? OnConsumerCreated { get; init; }
 }
 
 internal class NatsJSOrderedPushConsumer<T>
@@ -63,6 +110,7 @@ internal class NatsJSOrderedPushConsumer<T>
     private readonly Channel<NatsJSMsg<T>> _msgChannel;
     private readonly Channel<string> _consumerCreateChannel;
     private readonly Timer _timer;
+    private readonly NatsJSNotificationChannel? _notificationChannel;
     private readonly int _hbTimeout;
     private readonly Task _consumerCreateTask;
     private readonly Task _commandTask;
@@ -72,6 +120,7 @@ internal class NatsJSOrderedPushConsumer<T>
     private string _consumer;
     private volatile NatsJSOrderedPushConsumerSub<T>? _sub;
     private int _done;
+    private volatile bool _creationFailed;
 
     public NatsJSOrderedPushConsumer(
         INatsJSContext context,
@@ -86,13 +135,21 @@ internal class NatsJSOrderedPushConsumer<T>
         _debug = _logger.IsEnabled(LogLevel.Debug);
         _context = context;
         _stream = stream;
-        _filter = filter;
+        _filter = opts.FilterSubject ?? filter;
         _serializer = serializer;
         _opts = opts;
         _subOpts = subOpts;
         _cancellationToken = cancellationToken;
         _nats = context.Connection;
-        _hbTimeout = (int)new TimeSpan(opts.IdleHeartbeat.Ticks * 2).TotalMilliseconds;
+
+        if (opts.NotificationHandler is { } handler)
+        {
+            _notificationChannel = new NatsJSNotificationChannel(handler, e => _msgChannel?.Writer.TryComplete(e), cancellationToken);
+        }
+
+        _hbTimeout = opts.IdleHeartbeat is { } idleHeartbeat && idleHeartbeat > TimeSpan.Zero
+            ? (int)new TimeSpan(idleHeartbeat.Ticks * 2).TotalMilliseconds
+            : 0;
         _consumer = NewNuid();
 
         _nats.ConnectionDisconnected += OnDisconnected;
@@ -102,6 +159,7 @@ internal class NatsJSOrderedPushConsumer<T>
             {
                 var self = (NatsJSOrderedPushConsumer<T>)state!;
                 self.CreateSub("idle-heartbeat-timeout");
+                self._notificationChannel?.Notify(NatsJSTimeoutNotification.Default);
                 if (self._debug)
                 {
                     self._logger.LogDebug(
@@ -151,6 +209,8 @@ internal class NatsJSOrderedPushConsumer<T>
 
     public bool IsDone => Volatile.Read(ref _done) > 0;
 
+    public ConsumerInfo? Info { get; private set; }
+
     private string Consumer
     {
         get => Volatile.Read(ref _consumer);
@@ -166,6 +226,11 @@ internal class NatsJSOrderedPushConsumer<T>
 #else
         await _timer.DisposeAsync().ConfigureAwait(false);
 #endif
+
+        if (_notificationChannel is { } notificationChannel)
+        {
+            await notificationChannel.DisposeAsync().ConfigureAwait(false);
+        }
 
         // For correctly Dispose,
         // first stop the consumer Creation operations and then the command execution operations.
@@ -229,6 +294,9 @@ internal class NatsJSOrderedPushConsumer<T>
         {
             while (await _commandChannel.Reader.WaitToReadAsync(_cancellationToken))
             {
+                if (_creationFailed)
+                    break;
+
                 while (_commandChannel.Reader.TryRead(out var command))
                 {
                     try
@@ -353,7 +421,10 @@ internal class NatsJSOrderedPushConsumer<T>
                     }
                     catch (Exception e)
                     {
+                        _creationFailed = true;
+                        _msgChannel.Writer.TryComplete(e);
                         _logger.LogWarning(NatsJSLogEvents.RecreateConsumer, e, "Consumer create error");
+                        return;
                     }
                 }
             }
@@ -404,21 +475,43 @@ internal class NatsJSOrderedPushConsumer<T>
         var config = new ConsumerConfig
         {
             Name = Consumer,
-            DeliverPolicy = ConsumerConfigDeliverPolicy.All,
+            DeliverPolicy = _opts.DeliverPolicy,
             AckPolicy = ConsumerConfigAckPolicy.None,
             DeliverSubject = _sub.Subject,
-            FilterSubject = _filter,
+            FilterSubject = _opts.FilterSubjects is not { Length: > 0 } && !string.IsNullOrEmpty(_filter) ? _filter : null,
             FlowControl = true,
-            IdleHeartbeat = _opts.IdleHeartbeat,
             AckWait = TimeSpan.FromHours(22),
             MaxDeliver = 1,
             MemStorage = true,
             NumReplicas = 1,
-            ReplayPolicy = ConsumerConfigReplayPolicy.Instant,
+            ReplayPolicy = _opts.ReplayPolicy,
+            HeadersOnly = _opts.HeadersOnly,
         };
 
-        config.DeliverPolicy = _opts.DeliverPolicy;
-        config.HeadersOnly = _opts.HeadersOnly;
+        if (_opts.FilterSubjects is { Length: > 0 })
+        {
+            config.FilterSubjects = _opts.FilterSubjects;
+        }
+
+        if (_opts.InactiveThreshold is { } inactiveThreshold)
+        {
+            config.InactiveThreshold = inactiveThreshold;
+        }
+
+        if (_opts.IdleHeartbeat is { } idleHeartbeat && idleHeartbeat > TimeSpan.Zero)
+        {
+            config.IdleHeartbeat = idleHeartbeat;
+        }
+
+        if (_opts.OptStartSeq > 0)
+        {
+            config.OptStartSeq = _opts.OptStartSeq;
+        }
+
+        if (_opts.OptStartTime != default)
+        {
+            config.OptStartTime = _opts.OptStartTime;
+        }
 
         if (sequence > 0)
         {
@@ -426,10 +519,13 @@ internal class NatsJSOrderedPushConsumer<T>
             config.OptStartSeq = sequence + 1;
         }
 
-        await _context.CreateOrUpdateConsumerAsync(
+        var consumerInfo = await _context.CreateOrUpdateConsumerAsync(
             _stream,
             config,
             cancellationToken: _cancellationToken);
+
+        Info = consumerInfo.Info;
+        _opts.OnConsumerCreated?.Invoke(consumerInfo.Info);
 
         if (_debug)
         {

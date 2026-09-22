@@ -389,11 +389,10 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
 
         if (headersBuffer != null)
         {
-            headers = new NatsHeaders();
+            headers = new NatsHeaders(headerParser.CaseSensitiveHeaders);
 
             try
             {
-                // Parsing can also throw an exception.
                 if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
                 {
                     throw new NatsException("Error parsing headers");
@@ -417,7 +416,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
                 ? $"{nats.SpanDestinationName(subject)} {Telemetry.Constants.ReceiveActivityName}"
                 : Telemetry.Constants.ReceiveActivityName;
 
-            headers ??= new NatsHeaders();
+            headers ??= new NatsHeaders(headerParser.CaseSensitiveHeaders);
 
             receiveActivity = Telemetry.StartReceiveActivity(
                 connection,
@@ -455,7 +454,7 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
             }
             catch (Exception e)
             {
-                headers ??= new NatsHeaders();
+                headers ??= new NatsHeaders(headerParser.CaseSensitiveHeaders);
                 headers.Error = new NatsDeserializeException(payloadBuffer.ToArray(), e);
                 data = default;
             }

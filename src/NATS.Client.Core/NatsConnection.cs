@@ -102,7 +102,7 @@ public partial class NatsConnection : INatsConnection
         _subscriptionManager = new SubscriptionManager(this, InboxPrefix);
         _replyTaskFactory = new ReplyTaskFactory(this);
         _clientOpts = ClientOpts.Create(Opts);
-        HeaderParser = new NatsHeaderParser(opts.HeaderEncoding);
+        HeaderParser = new NatsHeaderParser(opts.HeaderEncoding, opts.CaseSensitiveHeaders);
         _defaultSubscriptionChannelOpts = new BoundedChannelOptions(opts.SubPendingChannelCapacity)
         {
             FullMode = opts.SubPendingChannelFullMode,

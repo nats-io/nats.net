@@ -125,4 +125,36 @@ public interface INatsJSStream
     ValueTask<NatsMsg<T>> GetDirectAsync<T>(StreamMsgGetRequest request, INatsDeserialize<T>? serializer = default, CancellationToken cancellationToken = default);
 
     ValueTask<StreamMsgGetResponse> GetAsync(StreamMsgGetRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a new push consumer on this stream.
+    /// </summary>
+    /// <param name="opts">Push consumer options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The NATS JetStream push consumer object.</returns>
+    ValueTask<INatsJSPushConsumer> CreatePushConsumerAsync(NatsJSPushConsumerOpts? opts = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a new push consumer if it doesn't exist or updates an existing one with the same name.
+    /// </summary>
+    /// <param name="opts">Push consumer options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The NATS JetStream push consumer object.</returns>
+    ValueTask<INatsJSPushConsumer> CreateOrUpdatePushConsumerAsync(NatsJSPushConsumerOpts? opts = default, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets an existing push consumer from the server and creates a <see cref="INatsJSPushConsumer"/> handle for it.
+    /// </summary>
+    /// <param name="consumer">Consumer name.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The NATS JetStream push consumer object.</returns>
+    ValueTask<INatsJSPushConsumer> GetPushConsumerAsync(string consumer, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a new ordered push consumer on this stream.
+    /// </summary>
+    /// <param name="opts">Ordered consumer options.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
+    /// <returns>The NATS JetStream push consumer object which can be used to retrieve ordered data.</returns>
+    ValueTask<INatsJSPushConsumer> CreateOrderedPushConsumerAsync(NatsJSOrderedConsumerOpts? opts = default, CancellationToken cancellationToken = default);
 }
