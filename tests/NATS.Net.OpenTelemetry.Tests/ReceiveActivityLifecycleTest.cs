@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Channels;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
 using NATS.Client.KeyValueStore;
@@ -373,5 +374,85 @@ public class ReceiveActivityLifecycleTest
         await act.Should().ThrowAsync<NatsNoRespondersException>();
 
         tracker.AssertAllStopped(server.Port);
+    }
+
+    [Fact]
+    public async Task Push_consumer_receive_spans_are_ended_when_channel_handoff_fails()
+    {
+        using var tracker = new ActivityTracker();
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await using var natsPub = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var js = new NatsJSContext(nats);
+        var jsPub = new NatsJSContext(natsPub);
+        await js.CreateStreamAsync(new StreamConfig { Name = "s1", Subjects = new[] { "s1.*" } });
+
+        var consumer = await js.CreatePushConsumerAsync(
+            "s1",
+            new NatsJSPushConsumerOpts
+            {
+                Name = "c1",
+                DeliverSubject = js.NewBaseInbox(),
+                FilterSubject = "s1.foo",
+                SubOpts = new NatsSubOpts { ChannelOpts = new NatsSubChannelOpts { Capacity = 1, FullMode = BoundedChannelFullMode.Wait } },
+            },
+            cts.Token);
+
+        var consumeCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        var firstMsg = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var consumeTask = Task.Run(
+            async () =>
+            {
+                await foreach (var msg in consumer.ConsumeAsync<int>(cancellationToken: consumeCts.Token))
+                {
+                    firstMsg.TrySetResult();
+                    await Task.Delay(Timeout.Infinite, consumeCts.Token);
+                }
+            },
+            cts.Token);
+
+        var ack = await jsPub.PublishAsync("s1.foo", 0, cancellationToken: cts.Token);
+        ack.EnsureSuccess();
+        await firstMsg.Task.WaitAsync(TimeSpan.FromSeconds(20), cts.Token);
+
+        for (var i = 1; i <= 3; i++)
+        {
+            var a = await jsPub.PublishAsync("s1.foo", i, cancellationToken: cts.Token);
+            a.EnsureSuccess();
+        }
+
+        await Task.Delay(TimeSpan.FromSeconds(1), cts.Token);
+
+        List<Activity> Unended()
+        {
+            var stoppedIds = tracker.Stopped.Select(a => a.Id!).ToHashSet();
+            return tracker.StartedFor(server.Port).Where(a => !stoppedIds.Contains(a.Id!)).ToList();
+        }
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (Unended().Count < 2)
+        {
+            var all = tracker.StartedFor(server.Port);
+            var unendedList = string.Join(",", Unended().Select(a => a.OperationName + "/" + a.GetTagItem("messaging.nats.message.subject")));
+            var consumerSubjects = string.Join(",", all.Where(a => a.Kind == ActivityKind.Consumer).Select(a => a.GetTagItem("messaging.nats.message.subject")));
+            var debug = $"started={all.Count} consumers={all.Count(a => a.Kind == ActivityKind.Consumer)} unended={Unended().Count} unendedList=[{unendedList}] consumerSubjects=[{consumerSubjects}]";
+            Assert.True(DateTime.UtcNow < deadline, $"expected an open span for the in-channel message and the blocked write ({debug})");
+            await Task.Delay(100, cts.Token);
+        }
+
+        consumeCts.Cancel();
+        await Task.WhenAny(consumeTask, Task.Delay(TimeSpan.FromSeconds(10)));
+
+        deadline = DateTime.UtcNow.AddSeconds(10);
+        while (Unended().Count > 1)
+        {
+            Assert.True(DateTime.UtcNow < deadline, "timed out waiting for the blocked write's receive activity to stop");
+            await Task.Delay(100, cts.Token);
+        }
+
+        Assert.Single(Unended());
     }
 }

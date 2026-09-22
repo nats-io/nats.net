@@ -393,7 +393,6 @@ public readonly record struct NatsMsg<T> : INatsMsg<T>
 
             try
             {
-                // Parsing can also throw an exception.
                 if (!headerParser.ParseHeaders(new SequenceReader<byte>(headersBuffer.Value), headers))
                 {
                     throw new NatsException("Error parsing headers");
