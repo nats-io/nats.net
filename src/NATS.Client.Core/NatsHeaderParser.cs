@@ -23,7 +23,21 @@ public class NatsHeaderParser
 
     private readonly Encoding _encoding;
 
-    public NatsHeaderParser(Encoding encoding) => _encoding = encoding;
+    public NatsHeaderParser(Encoding encoding)
+        : this(encoding, caseSensitiveHeaders: false)
+    {
+    }
+
+    public NatsHeaderParser(Encoding encoding, bool caseSensitiveHeaders)
+    {
+        _encoding = encoding;
+        CaseSensitiveHeaders = caseSensitiveHeaders;
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether parsed headers match header names case-sensitively.
+    /// </summary>
+    public bool CaseSensitiveHeaders { get; }
 
     public bool ParseHeaders(SequenceReader<byte> reader, NatsHeaders headers)
     {
