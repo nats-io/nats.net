@@ -246,9 +246,12 @@ public class ConsumerConsumeTest
             ack.EnsureSuccess();
         }
 
+        // Match both ack reply formats (ADR-15):
+        // v1: $JS.ACK.<stream>.<consumer>.<...>
+        // v2: $JS.ACK.<domain>.<account hash>.<stream>.<consumer>.<...>
         await Retry.Until(
             "acked",
-            () => proxy.ClientFrames.Any(f => f.Message.StartsWith($"PUB $JS.ACK.{prefix}s1.{prefix}c1")),
+            () => proxy.ClientFrames.Any(f => f.Message.StartsWith("PUB $JS.ACK.") && f.Message.Contains($".{prefix}s1.{prefix}c1.")),
             timeout: TimeSpan.FromSeconds(20),
             retryDelay: TimeSpan.FromSeconds(1));
 
