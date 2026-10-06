@@ -1140,7 +1140,17 @@ public partial class NatsConnection : INatsConnection
                     }
                 }
 
-                await PingOnlyAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await PingOnlyAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (NatsTimeoutException)
+                {
+                    // Couldn't get the PING out (e.g. send buffer full on a dead connection).
+                    // Count it as a missed PONG so MaxPingOut can still abort the connection.
+                    _logger.LogDebug(NatsLogEvents.Connection, "Ping write timed out");
+                }
+
                 await periodicTimer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false);
             }
         }
