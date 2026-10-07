@@ -51,6 +51,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     private long _pendingBytes;
     private int _consecutive503Errors;
     private volatile bool _draining;
+    private int _timeoutNotified;
 
     public NatsJSConsume(
         long maxMsgs,
@@ -122,7 +123,10 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                 if (self._draining)
                     return;
 
-                self._notificationChannel?.Notify(NatsJSTimeoutNotification.Default);
+                if (Interlocked.Exchange(ref self._timeoutNotified, 1) == 0)
+                {
+                    self._notificationChannel?.Notify(NatsJSTimeoutNotification.Default);
+                }
 
                 if (self._cancellationToken.IsCancellationRequested)
                 {
@@ -213,6 +217,7 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         if (_draining)
             return;
 
+        Interlocked.Exchange(ref _timeoutNotified, 0);
         _timer.Change(_hbTimeout, _hbTimeout);
     }
 
