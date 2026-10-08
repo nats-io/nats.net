@@ -56,20 +56,31 @@ public class SocketConnectionWrapperTests
         var socket = new SocketConnectionWrapper(new FakeSocketConnection(innerDisposeStarted, innerDisposeGate.Task));
 
         var disposeTask = socket.DisposeAsync().AsTask();
-        await innerDisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await WithTimeout(innerDisposeStarted.Task, TimeSpan.FromSeconds(10));
 
         try
         {
             var signalTask = Task.Run(() => socket.SignalDisconnected(new Exception("closed")));
-            await signalTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await WithTimeout(signalTask, TimeSpan.FromSeconds(5));
         }
         finally
         {
             innerDisposeGate.TrySetResult(true);
-            await disposeTask.WaitAsync(TimeSpan.FromSeconds(10));
+            await WithTimeout(disposeTask, TimeSpan.FromSeconds(10));
         }
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => socket.WaitForClosed);
+    }
+
+    // Task.WaitAsync is not available on net481.
+    private static async Task WithTimeout(Task task, TimeSpan timeout)
+    {
+        if (await Task.WhenAny(task, Task.Delay(timeout)) != task)
+        {
+            throw new TimeoutException("The operation has timed out.");
+        }
+
+        await task;
     }
 
     private class FakeSocketConnection(TaskCompletionSource<bool>? disposeStarted = null, Task? disposeGate = null) : INatsSocketConnection
