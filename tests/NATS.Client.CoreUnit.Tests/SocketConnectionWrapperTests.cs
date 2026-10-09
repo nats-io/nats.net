@@ -45,9 +45,54 @@ public class SocketConnectionWrapperTests
         }
     }
 
-    private class FakeSocketConnection : INatsSocketConnection
+    [Fact]
+    public async Task SignalDisconnected_DoesNotBlock_WhileInnerSocketIsDisposing()
     {
-        public ValueTask DisposeAsync() => default;
+        // A WebSocket close completes the pending receive, so the read loop calls
+        // SignalDisconnected while DisposeAsync is still awaiting the inner socket.
+        // On a single-threaded host (Blazor WebAssembly) blocking there freezes the app.
+        var innerDisposeStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var innerDisposeGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var socket = new SocketConnectionWrapper(new FakeSocketConnection(innerDisposeStarted, innerDisposeGate.Task));
+
+        var disposeTask = socket.DisposeAsync().AsTask();
+        await WithTimeout(innerDisposeStarted.Task, TimeSpan.FromSeconds(10));
+
+        try
+        {
+            var signalTask = Task.Run(() => socket.SignalDisconnected(new Exception("closed")));
+            await WithTimeout(signalTask, TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            innerDisposeGate.TrySetResult(true);
+            await WithTimeout(disposeTask, TimeSpan.FromSeconds(10));
+        }
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => socket.WaitForClosed);
+    }
+
+    // Task.WaitAsync is not available on net481.
+    private static async Task WithTimeout(Task task, TimeSpan timeout)
+    {
+        if (await Task.WhenAny(task, Task.Delay(timeout)) != task)
+        {
+            throw new TimeoutException("The operation has timed out.");
+        }
+
+        await task;
+    }
+
+    private class FakeSocketConnection(TaskCompletionSource<bool>? disposeStarted = null, Task? disposeGate = null) : INatsSocketConnection
+    {
+        public async ValueTask DisposeAsync()
+        {
+            disposeStarted?.TrySetResult(true);
+            if (disposeGate != null)
+            {
+                await disposeGate;
+            }
+        }
 
         public ValueTask<int> ReceiveAsync(Memory<byte> buffer) => throw new NotImplementedException();
 
