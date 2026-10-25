@@ -583,6 +583,7 @@ public partial class NatsConnection : INatsConnection
             throw exception;
         }
 
+        string openedUrl;
         lock (_gate)
         {
             var url = _currentConnectUri;
@@ -594,9 +595,16 @@ public partial class NatsConnection : INatsConnection
 #pragma warning disable VSTHRD103
             _initialConnectCts.Cancel();
 #pragma warning restore VSTHRD103
-            _reconnectLoopTask = Task.Run(ReconnectLoop);
-            PushEvent(NatsEvent.ConnectionOpened, new NatsEventArgs(url?.ToString() ?? string.Empty));
+            openedUrl = url?.ToString() ?? string.Empty;
         }
+
+        // Queue the event outside the connection lock: the lock protects the connection state only,
+        // the event channel write must not happen while holding it.
+        PushEvent(NatsEvent.ConnectionOpened, new NatsEventArgs(openedUrl));
+
+        // The reconnect loop is started only after the open event is queued, so a disconnect can
+        // never be reported before the matching open.
+        _reconnectLoopTask = Task.Run(ReconnectLoop);
     }
 
     private async Task ConnectSocketAsync(NatsUri uri)
@@ -911,6 +919,7 @@ public partial class NatsConnection : INatsConnection
             }
 
             bool emitReconnect;
+            string openedUrl;
             lock (_gate)
             {
                 _connectRetry = 0;
@@ -921,9 +930,15 @@ public partial class NatsConnection : INatsConnection
                 _pingTimerCancellationTokenSource = new CancellationTokenSource();
                 StartPingTimer(_pingTimerCancellationTokenSource.Token);
                 _waitForOpenConnection.TrySetResult();
-                _reconnectLoopTask = Task.Run(ReconnectLoop);
-                PushEvent(NatsEvent.ConnectionOpened, new NatsEventArgs(url.ToString()));
+                openedUrl = url.ToString();
             }
+
+            // Queue the event outside the connection lock (see InitialConnectAsync).
+            PushEvent(NatsEvent.ConnectionOpened, new NatsEventArgs(openedUrl));
+
+            // The next reconnect cycle is started only after the open event is queued, so the
+            // disconnect of the next cycle can never be reported before this open.
+            _reconnectLoopTask = Task.Run(ReconnectLoop);
 
             if (emitReconnect)
                 Telemetry.Reconnects.Add(1, Telemetry.BuildMetricTags(this, Telemetry.Constants.OpReconnect));
