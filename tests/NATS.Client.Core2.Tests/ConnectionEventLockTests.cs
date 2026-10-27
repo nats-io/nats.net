@@ -36,87 +36,100 @@ public class ConnectionEventLockTests
     public async Task Connection_opened_event_is_queued_without_holding_the_connection_lock_on_reconnect()
     {
         var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts
+        try
         {
-            Url = server.Url,
-            ReconnectWaitMin = TimeSpan.FromMilliseconds(100),
-            ReconnectWaitMax = TimeSpan.FromMilliseconds(100),
-            ReconnectJitter = TimeSpan.Zero,
-        });
+            await using var nats = new NatsConnection(new NatsOpts
+            {
+                Url = server.Url,
+                ReconnectWaitMin = TimeSpan.FromMilliseconds(100),
+                ReconnectWaitMax = TimeSpan.FromMilliseconds(100),
+                ReconnectJitter = TimeSpan.Zero,
+            });
 
-        using var observer = new PushObserver(nats);
-        await observer.WaitUntilPublisherParkedAsync();
-        await observer.VerifyObservationMechanismAsync();
+            using var observer = new PushObserver(nats);
+            await observer.WaitUntilPublisherParkedAsync();
+            await observer.VerifyObservationMechanismAsync();
 
-        await nats.ConnectAsync();
+            await nats.ConnectAsync();
 
-        await server.StopAsync();
-        await Retry.Until(
-            "disconnected",
-            () => nats.ConnectionState == NatsConnectionState.Reconnecting,
-            timeout: TimeSpan.FromSeconds(30));
+            await server.StopAsync();
+            await Retry.Until(
+                "disconnected",
+                () => nats.ConnectionState == NatsConnectionState.Reconnecting,
+                timeout: TimeSpan.FromSeconds(30));
 
-        server = await server.RestartAsync();
+            server = await server.RestartAsync();
 
-        await Retry.Until(
-            "reconnected",
-            () => observer.ConnectionOpens.Count >= 2,
-            timeout: TimeSpan.FromSeconds(30));
+            await Retry.Until(
+                "reconnected",
+                () => observer.ConnectionOpens.Count >= 2,
+                timeout: TimeSpan.FromSeconds(30));
 
-        // The reconnect push must not happen under the lock either.
-        observer.ConnectionOpens.Should().OnlyContain(o => !o.GateHeld);
-
-        await server.DisposeAsync();
+            // The reconnect push must not happen under the lock either.
+            observer.ConnectionOpens.Should().OnlyContain(o => !o.GateHeld);
+        }
+        finally
+        {
+            // Restarting replaces the server object, so no using declaration can own it.
+            await server.DisposeAsync();
+        }
     }
 
     [Fact]
     public async Task Connection_events_are_reported_in_order_across_a_reconnect()
     {
         var server = await NatsServerProcess.StartAsync();
-        var events = new EventLog();
-
-        await using var nats = new NatsConnection(new NatsOpts
+        try
         {
-            Url = server.Url,
-            ReconnectWaitMin = TimeSpan.FromMilliseconds(100),
-            ReconnectWaitMax = TimeSpan.FromMilliseconds(100),
-            ReconnectJitter = TimeSpan.Zero,
-        });
+            var events = new EventLog();
 
-        nats.ConnectionOpened += (_, _) =>
+            await using var nats = new NatsConnection(new NatsOpts
+            {
+                Url = server.Url,
+                ReconnectWaitMin = TimeSpan.FromMilliseconds(100),
+                ReconnectWaitMax = TimeSpan.FromMilliseconds(100),
+                ReconnectJitter = TimeSpan.Zero,
+            });
+
+            nats.ConnectionOpened += (_, _) =>
+            {
+                events.Add("opened");
+                return default;
+            };
+            nats.ConnectionDisconnected += (_, _) =>
+            {
+                events.Add("disconnected");
+                return default;
+            };
+
+            await nats.ConnectAsync();
+
+            await server.StopAsync();
+            await Retry.Until(
+                "disconnect reported",
+                () => events.Count("disconnected") >= 1,
+                timeout: TimeSpan.FromSeconds(30));
+
+            server = await server.RestartAsync();
+
+            await Retry.Until(
+                "reconnect reported",
+                () => events.Count("opened") >= 2,
+                timeout: TimeSpan.FromSeconds(30));
+
+            // The open of a cycle is always reported before the disconnect that follows it.
+            var order = events.Snapshot();
+            order.IndexOf("opened").Should().BeLessThan(order.IndexOf("disconnected"));
+            order.LastIndexOf("opened").Should().BeGreaterThan(order.IndexOf("disconnected"));
+
+            // No event is duplicated and none is lost.
+            events.Count("opened").Should().Be(2);
+            events.Count("disconnected").Should().Be(1);
+        }
+        finally
         {
-            events.Add("opened");
-            return default;
-        };
-        nats.ConnectionDisconnected += (_, _) =>
-        {
-            events.Add("disconnected");
-            return default;
-        };
-
-        await nats.ConnectAsync();
-
-        await server.StopAsync();
-        await Retry.Until(
-            "disconnect reported",
-            () => events.Count("disconnected") >= 1,
-            timeout: TimeSpan.FromSeconds(30));
-
-        server = await server.RestartAsync();
-
-        await Retry.Until(
-            "reconnect reported",
-            () => events.Count("opened") >= 2,
-            timeout: TimeSpan.FromSeconds(30));
-
-        // The open of a cycle is always reported before the disconnect that follows it.
-        var order = events.Snapshot();
-        order.IndexOf("opened").Should().BeLessThan(order.IndexOf("disconnected"));
-        order.LastIndexOf("opened").Should().BeGreaterThan(order.IndexOf("disconnected"));
-
-        // No event is duplicated and none is lost.
-        events.Count("opened").Should().Be(2);
-        events.Count("disconnected").Should().Be(1);
+            await server.DisposeAsync();
+        }
     }
 
     [Fact]
