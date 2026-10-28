@@ -924,17 +924,20 @@ public partial class NatsConnection : INatsConnection
 
             bool emitReconnect;
             string openedUrl;
+
+            // OnConnectingAsync may have redirected the connection, so report the URI the socket was opened to.
+            var connectedUri = _currentConnectUri ?? url;
             lock (_gate)
             {
                 _connectRetry = 0;
                 _backoff = TimeSpan.Zero;
-                _logger.LogInformation(NatsLogEvents.Connection, "Connection succeeded {Name}, NATS {Url} [{ReconnectCount}]", _name, url, reconnectCount);
+                _logger.LogInformation(NatsLogEvents.Connection, "Connection succeeded {Name}, NATS {Url} [{ReconnectCount}]", _name, connectedUri, reconnectCount);
                 ConnectionState = NatsConnectionState.Open;
                 emitReconnect = Telemetry.Reconnects.Enabled;
                 _pingTimerCancellationTokenSource = new CancellationTokenSource();
                 StartPingTimer(_pingTimerCancellationTokenSource.Token);
                 _waitForOpenConnection.TrySetResult();
-                openedUrl = url.ToString();
+                openedUrl = connectedUri.ToString();
             }
 
             // Queue the event outside the connection lock (see InitialConnectAsync).
