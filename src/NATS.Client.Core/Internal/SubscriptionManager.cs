@@ -299,13 +299,17 @@ internal sealed class SubscriptionManager : INatsSubscriptionManager, IAsyncDisp
                     // We use 'default' options here since options provided by the user are for the internal subscription.
                     // For example if the user provides a timeout, we don't want to timeout the real inbox subscription
                     // since it must live duration of the connection.
-                    _inboxSub = InboxSubBuilder.Build(inboxSubject, opts: default, _connection, manager: this);
+                    // Publish the sub only once the SUB is written: the unlocked check above
+                    // must not see an inbox the server does not know about yet, and a failed
+                    // subscribe must leave the sentinel in place so the next attempt retries.
+                    var inboxSub = InboxSubBuilder.Build(inboxSubject, opts: default, _connection, manager: this);
                     await SubscribeInternalAsync(
                         inboxSubject,
                         queueGroup: default,
                         opts: default,
-                        _inboxSub,
+                        inboxSub,
                         cancellationToken).ConfigureAwait(false);
+                    _inboxSub = inboxSub;
                 }
             }
             finally

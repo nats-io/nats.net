@@ -604,6 +604,8 @@ public class RequestReplyTest
             var connect = Task.Run(async () => await nats.ConnectAsync(), cancellationToken);
             while (nats.ConnectionState != NatsConnectionState.Open)
             {
+                if (connect.IsCompleted)
+                    await connect; // surfaces a failed connect instead of spinning until the timeout
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
