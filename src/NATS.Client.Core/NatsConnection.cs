@@ -264,11 +264,6 @@ public partial class NatsConnection : INatsConnection
 
                 // Only Closed(initial) state, can run initial connect.
                 await InitialConnectAsync().ConfigureAwait(false);
-
-                if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
-                {
-                    await _subscriptionManager.InitializeInboxSubscriptionAsync(_disposedCts.Token).ConfigureAwait(false);
-                }
             }
             catch (NatsException)
             {
@@ -755,6 +750,15 @@ public partial class NatsConnection : INatsConnection
 
             // create the socket writer
             CommandWriter.Reset(_socketConnection!);
+
+            // Queue the reply inbox SUB before the connection is reported open. Anything a caller
+            // publishes once released is written to the same pipe after it, so a Direct mode
+            // request cannot reach the server ahead of the subscription for its reply. On a
+            // reconnect the inbox already exists and was replayed above, so this is a no-op.
+            if (Opts.RequestReplyMode == NatsRequestReplyMode.Direct)
+            {
+                await _subscriptionManager.InitializeInboxSubscriptionAsync(_disposedCts.Token).ConfigureAwait(false);
+            }
 
             lock (_gate)
             {

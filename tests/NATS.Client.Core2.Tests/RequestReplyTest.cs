@@ -580,4 +580,41 @@ public class RequestReplyTest
             await nats.RequestAsync<int, int>($"foo.{Guid.NewGuid():N}", 1, replyOpts: replyOpts);
         });
     }
+
+    [Fact]
+    public async Task Direct_request_issued_as_soon_as_connection_opens_gets_reply()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cancellationToken = cts.Token;
+        var subject = $"{_server.GetNextId()}.echo";
+
+        await using var responder = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await using var sub = await responder.SubscribeCoreAsync<int>(subject, cancellationToken: cancellationToken);
+        var reg = sub.Register(async msg => await msg.ReplyAsync(msg.Data, cancellationToken: cancellationToken));
+        await responder.PingAsync(cancellationToken);
+
+        var replyOpts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(2) };
+
+        for (var i = 0; i < 1000; i++)
+        {
+            await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.Direct });
+
+            // Spin until the connection reports Open, then request at once. The reply
+            // inbox must already be subscribed by then, otherwise the reply is lost.
+            var connect = Task.Run(async () => await nats.ConnectAsync(), cancellationToken);
+            while (nats.ConnectionState != NatsConnectionState.Open)
+            {
+                if (connect.IsCompleted)
+                    await connect; // surfaces a failed connect instead of spinning until the timeout
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            var reply = await nats.RequestAsync<int, int>(subject, i, replyOpts: replyOpts, cancellationToken: cancellationToken);
+            Assert.Equal(i, reply.Data);
+            await connect;
+        }
+
+        await sub.UnsubscribeAsync();
+        await reg;
+    }
 }
