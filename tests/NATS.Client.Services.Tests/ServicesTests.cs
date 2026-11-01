@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
+using NATS.Client.TestUtilities;
 using NATS.Client.TestUtilities2;
 using Synadia.Orbit.Testing.NatsServerProcessManager;
 
@@ -221,6 +222,209 @@ public class ServicesTests
 
         await removeTask;
         Assert.Equal(36, (await replyTask).Data);
+    }
+
+    [Fact]
+    public async Task Stop_end_point_drains_in_flight_messages()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        // The mock server holds the request back and only releases it once the client has
+        // unsubscribed from the endpoint. That is the window in which disposing an endpoint
+        // (instead of draining it) loses the request: the subscription is gone from the
+        // routing table before the message is read, so the message is dropped.
+        //
+        // Draining fences the delivery instead: UNSUB, then a PING/PONG round-trip. By the
+        // time the PONG arrives, the client has read everything the server sent before it
+        // processed the UNSUB, so the request is delivered and handled.
+        //
+        // The server releases the request when it receives the UNSUB for the endpoint's own
+        // subscription, which guarantees the ordering on the wire: the request was published
+        // before the UNSUB was processed, so the client receives the request before the PONG
+        // that fences the drain.
+        var requestReceived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        MockServer.Cmd? held = null;
+        string? endpointSid = null;
+
+        await using var server = new MockServer(
+            handler: (client, cmd) =>
+            {
+                switch (cmd.Name)
+                {
+                case "SUB" when cmd.Subject == "e1":
+                    endpointSid = cmd.Sid;
+                    break;
+
+                case "PUB" when cmd.Subject == "e1":
+                    // Do not deliver the request yet. It stays in flight until the client
+                    // has unsubscribed, which is exactly what the drain has to fence.
+                    held = cmd;
+                    requestReceived.TrySetResult();
+                    break;
+
+                case "UNSUB" when held != null && cmd.Sid == endpointSid:
+                    // The client unsubscribed from the endpoint. Release the request that
+                    // was published before the UNSUB was processed.
+                    client.SendMsg(held.Subject, held.ReplyTo, payload: new string(held.Buffer!));
+                    held = null;
+                    break;
+
+                case "PUB" when cmd.Subject.StartsWith("_INBOX."):
+                    // The endpoint handler replied. Route the reply back to the requester.
+                    client.SendMsg(cmd.Subject, payload: new string(cmd.Buffer!));
+                    break;
+
+                default:
+                    break;
+                }
+
+                return Task.CompletedTask;
+            },
+            logger: m => _output.WriteLine(m),
+            cancellationToken: cts.Token);
+
+        await server.Ready;
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        var handled = 0;
+
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m =>
+            {
+                Interlocked.Increment(ref handled);
+                await m.ReplyAsync(m.Data * m.Data, cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
+
+        var replyTask = nats.RequestAsync<int, int>("e1", 6, cancellationToken: cancellationToken).AsTask();
+
+        // Wait until the server has the request but has not delivered it yet.
+        await requestReceived.Task;
+        _output.WriteLine($"[T] request received at {DateTime.UtcNow:HH:mm:ss.fff}");
+
+        // Stopping the service must not lose the request that is in flight.
+        await s1.StopAsync(cancellationToken);
+        _output.WriteLine($"[T] stop completed at {DateTime.UtcNow:HH:mm:ss.fff}");
+
+        Assert.Equal(36, (await replyTask).Data);
+        Assert.Equal(1, Volatile.Read(ref handled));
+    }
+
+    [Fact]
+    public async Task Stop_service_waits_for_multiple_endpoints()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        var handlerStarted1 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handlerStarted2 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandler = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m =>
+            {
+                handlerStarted1.TrySetResult();
+                await releaseHandler.Task;
+                await m.ReplyAsync(m.Data * m.Data, cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
+
+        await s1.AddEndpointAsync<int>(
+            name: "e2",
+            handler: async m =>
+            {
+                handlerStarted2.TrySetResult();
+                await releaseHandler.Task;
+                await m.ReplyAsync(m.Data * m.Data, cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
+
+        var replyTask1 = nats.RequestAsync<int, int>("e1", 6, cancellationToken: cancellationToken).AsTask();
+        var replyTask2 = nats.RequestAsync<int, int>("e2", 7, cancellationToken: cancellationToken).AsTask();
+
+        await handlerStarted1.Task;
+        await handlerStarted2.Task;
+
+        // Both endpoints are being handled, so stopping must wait for both.
+        var stopTask = s1.StopAsync(cancellationToken).AsTask();
+        Assert.False(stopTask.IsCompleted);
+
+        releaseHandler.SetResult();
+
+        await stopTask;
+        Assert.Equal(36, (await replyTask1).Data);
+        Assert.Equal(49, (await replyTask2).Data);
+    }
+
+    [Fact]
+    public async Task Stop_service_without_end_points_does_not_throw()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        // Stopping a service that has no endpoints must simply do nothing.
+        await s1.StopAsync(cancellationToken);
+
+        // Stopping it again is a no-op, as the service is already stopped.
+        await s1.StopAsync(cancellationToken);
+
+        // Disposing it after it was stopped must not throw either.
+        await s1.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Stop_service_dispose_releases_end_points_when_connection_is_closed()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        var handled = 0;
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m =>
+            {
+                Interlocked.Increment(ref handled);
+                await m.ReplyAsync(m.Data * m.Data, cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
+
+        // Close the connection underneath the service.
+        await server.StopAsync();
+
+        // Disposing the service must release the endpoints even though the connection is
+        // gone and the drain cannot fence the delivery anymore. It must not hang either.
+        await s1.DisposeAsync();
+
+        Assert.Equal(0, Volatile.Read(ref handled));
     }
 
     [Fact]

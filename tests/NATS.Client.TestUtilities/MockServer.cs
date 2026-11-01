@@ -102,6 +102,13 @@ public class MockServer : IAsyncDisposable
                                 client.AddSid(subject, sid);
                                 await handler(client, new Cmd("SUB", subject, null, 0, 0, null, sid, client));
                             }
+                            else if (line.StartsWith("UNSUB"))
+                            {
+                                // C: UNSUB <sid> [max_msgs]␍␊
+                                var m = Regex.Match(line, @"^UNSUB\s+(?<sid>\S+)(?:\s+(?<maxMsgs>\d+))?$");
+                                var sid = m.Groups["sid"].Value;
+                                await handler(client, new Cmd("UNSUB", string.Empty, null, 0, 0, null, sid, client));
+                            }
                             else if (line.StartsWith("PUB") || line.StartsWith("HPUB"))
                             {
                                 // C: PUB <subject> [reply-to] <#bytes>␍␊[payload]␍␊
