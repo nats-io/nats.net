@@ -713,7 +713,18 @@ public class NatsKVStore : INatsKVStore
             subOpts: default,
             cancellationToken: cancellationToken);
 
-        await watcher.InitAsync();
+        try
+        {
+            await watcher.InitAsync();
+        }
+        catch
+        {
+            // The watcher is never returned to the caller, so dispose it here. Otherwise its
+            // delivery subscription stays registered on the connection and keeps any consumer
+            // the server did create alive.
+            await watcher.DisposeAsync();
+            throw;
+        }
 
         return watcher;
     }
