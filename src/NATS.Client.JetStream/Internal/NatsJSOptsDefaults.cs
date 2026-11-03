@@ -1,4 +1,7 @@
 using NATS.Client.Core;
+#if NETSTANDARD
+using Random = NATS.Client.Core.Internal.NetStandardExtensions.Random;
+#endif
 
 namespace NATS.Client.JetStream.Internal;
 
@@ -8,6 +11,23 @@ internal static class NatsJSOptsDefaults
     private static readonly TimeSpan ExpiresMin = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan HeartbeatCap = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan HeartbeatMin = TimeSpan.FromSeconds(.5);
+    private static readonly TimeSpan NoRespondersQuickRepullDelayMin = TimeSpan.FromMilliseconds(10);
+
+    internal static bool TryGetNoRespondersQuickRepullDelay(int quickRepull, TimeSpan idleHeartbeat, out TimeSpan delay)
+    {
+        // Without heartbeats, the heartbeat timer fires straight after every reply anyway
+        if (quickRepull is < 1 or > 8 || idleHeartbeat <= TimeSpan.Zero)
+        {
+            delay = default;
+            return false;
+        }
+
+        // Within the idle heartbeat, so the heartbeat timeout (twice that, from the 503) can't fire before the re-pull
+        var ticks = Math.Min(NoRespondersQuickRepullDelayMin.Ticks << (quickRepull - 1), idleHeartbeat.Ticks);
+
+        delay = TimeSpan.FromTicks((ticks / 2) + (long)(ticks / 2 * Random.Shared.NextDouble()));
+        return true;
+    }
 
     internal static (long MaxMsgs, long MaxBytes, long ThresholdMsgs, long ThresholdBytes) SetMax(
         long? maxMsgs = default,
