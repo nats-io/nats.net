@@ -237,9 +237,10 @@ public class NatsKVWatcherTest
         var store1 = await kv1.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
 
         var signal = new WaitSignal(timeout);
+        var proxy = new NatsProxy(_server.Port);
         await using var nats2 = new NatsConnection(new NatsOpts
         {
-            Url = _server.Url,
+            Url = $"nats://127.0.0.1:{proxy.Port}",
             LoggerFactory = new InMemoryTestLoggerFactory(
                 level: LogLevel.Debug,
                 logger: log =>
@@ -251,7 +252,6 @@ public class NatsKVWatcherTest
                     }
                 }),
         });
-        var proxy = new NatsProxy(_server.Port);
         var js2 = new NatsJSContext(nats2);
         var kv2 = new NatsKVContext(js2);
         var store2 = (NatsKVStore)await kv2.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
