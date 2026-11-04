@@ -945,4 +945,38 @@ public class ServicesTests
 
         Assert.Equal("Queue group is invalid.", exception.Message);
     }
+
+    [Fact]
+    public async Task Service_outlives_the_token_passed_to_add_service()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        using var createCts = new CancellationTokenSource();
+        await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: createCts.Token);
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m => await m.ReplyAsync(m.Data * 2, cancellationToken: cancellationToken),
+            cancellationToken: cancellationToken);
+
+        createCts.Cancel();
+
+        // Cancelling the creation token must not touch the running service:
+        // discovery and the endpoint both still answer.
+        Assert.Equal(42, (await nats.RequestAsync<int, int>("e1", 21, cancellationToken: cancellationToken)).Data);
+        Assert.Contains("s1", (await nats.RequestAsync<string, string>("$SRV.PING.s1", "{}", cancellationToken: cancellationToken)).Data);
+
+        await s1.StopAsync(cancellationToken);
+
+        // After stop nothing answers, discovery or endpoint.
+        await Assert.ThrowsAsync<NatsNoRespondersException>(async () =>
+            await nats.RequestAsync<int, int>("e1", 0, cancellationToken: cancellationToken));
+        await Assert.ThrowsAsync<NatsNoRespondersException>(async () =>
+            await nats.RequestAsync<string, string>("$SRV.PING.s1", "{}", cancellationToken: cancellationToken));
+    }
 }

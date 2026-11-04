@@ -30,14 +30,17 @@ public class NatsSvcServer : INatsSvcServer
     /// </summary>
     /// <param name="nats">NATS connection.</param>
     /// <param name="config">Service configuration.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the service creation requests.</param>
+    /// <param name="cancellationToken">Not used. The service runs until <see cref="StopAsync"/> or <see cref="DisposeAsync"/> is called.</param>
     public NatsSvcServer(INatsConnection nats, NatsSvcConfig config, CancellationToken cancellationToken)
     {
         _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcServer>();
         _id = Nuid.NewNuid();
         _nats = nats;
         _config = config;
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        // Not linked to the caller's token: that token also ended the discovery listeners
+        // and made StopAsync a no-op, while the endpoints kept serving.
+        _cts = new CancellationTokenSource();
         _channel = Channel.CreateBounded<SvcMsg>(32);
         _taskMsgLoop = Task.Run(MsgLoop);
         _started = DateTimeOffset.UtcNow.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffffff'Z'");
