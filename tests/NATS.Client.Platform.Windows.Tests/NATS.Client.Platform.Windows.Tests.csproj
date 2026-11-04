@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
+        <OutputType>Exe</OutputType>
         <TargetFrameworks>net8.0;net481</TargetFrameworks>
         <RuntimeIdentifiers>any;win-x86</RuntimeIdentifiers>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -19,8 +20,8 @@
           <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-        <PackageReference Include="xunit.v3" Version="1.0.1" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="3.0.1">
+        <PackageReference Include="xunit.v3" Version="1.1.0" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.0.2">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>

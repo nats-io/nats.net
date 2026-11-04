@@ -510,11 +510,26 @@ internal sealed class CommandWriter : IAsyncDisposable
                 await _flushTask!.ConfigureAwait(false);
             }
 
-            _flushTask = Task.Delay(timeSpan, cancellationToken);
+            _flushTask = StallAsync(timeSpan, cancellationToken);
         }
         finally
         {
             _semLock.Release();
+        }
+    }
+
+    // Ends the stall as a completed task when the token fires. A cancelled task left in
+    // _flushTask would surface as TaskCanceledException from every later command and from
+    // DisposeAsync, since only a real flush replaces it.
+    private static async Task StallAsync(TimeSpan timeSpan, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(timeSpan, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Stall ended early by the caller. Complete, do not cancel.
         }
     }
 

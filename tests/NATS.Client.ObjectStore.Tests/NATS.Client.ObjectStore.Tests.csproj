@@ -3,6 +3,7 @@
     <PropertyGroup>
         <!-- net481 resolves the netstandard2.0 build of the client, the only TFM that compiles
              the netstandard2.0-specific code paths (e.g. the PutAsync read loop). -->
+        <OutputType>Exe</OutputType>
         <TargetFrameworks>net8.0</TargetFrameworks>
         <TargetFrameworks Condition="'$(OS)' == 'Windows_NT'">$(TargetFrameworks);net481</TargetFrameworks>
         <RuntimeIdentifiers Condition="'$(OS)' == 'Windows_NT'">any;win-x86</RuntimeIdentifiers>
@@ -17,8 +18,8 @@
 
     <ItemGroup>
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-      <PackageReference Include="xunit.v3" Version="1.0.1" />
-      <PackageReference Include="xunit.runner.visualstudio" Version="3.0.1">
+      <PackageReference Include="xunit.v3" Version="1.1.0" />
+      <PackageReference Include="xunit.runner.visualstudio" Version="3.0.2">
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         <PrivateAssets>all</PrivateAssets>
       </PackageReference>
