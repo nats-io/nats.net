@@ -55,9 +55,16 @@ public class JetStreamApiSerializerTest
             async () =>
             {
                 var data = new string('x', 1024);
-                while (ctsDone.IsCancellationRequested == false)
+                try
                 {
-                    await nats.PublishAsync(dataSubject, data, cancellationToken: ctsDone.Token);
+                    while (ctsDone.IsCancellationRequested == false)
+                    {
+                        await nats.PublishAsync(dataSubject, data, cancellationToken: ctsDone.Token);
+                    }
+                }
+                catch (OperationCanceledException) when (ctsDone.IsCancellationRequested)
+                {
+                    // Shutdown signalled while a publish was in flight.
                 }
             },
             cts.Token));
