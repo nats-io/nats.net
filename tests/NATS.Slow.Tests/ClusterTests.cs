@@ -50,10 +50,10 @@ public class ClusterTests(ITestOutputHelper output)
             NoRandomize = true,
             Url = $"{url1},{url2}",
         });
-        await nats.ConnectRetryAsync();
-
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
+        // Subscribe before connecting: the event is dropped when no handler is attached,
+        // and the first open is what triggers stopping cluster 1 below.
         HashSet<string> connectedUrls = new();
         nats.ConnectionOpened += (_, _) =>
         {
@@ -62,6 +62,7 @@ public class ClusterTests(ITestOutputHelper output)
             return default;
         };
 
+        await nats.ConnectRetryAsync();
         await nats.PingAsync(cts.Token);
 
         var currentConnectedUrlCount = 0;
