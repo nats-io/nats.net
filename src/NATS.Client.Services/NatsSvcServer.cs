@@ -6,6 +6,9 @@ using NATS.Client.Core;
 using NATS.Client.Core.Internal;
 using NATS.Client.Services.Internal;
 using NATS.Client.Services.Models;
+#if NETSTANDARD
+using NATS.Client.Core.Internal.NetStandardExtensions;
+#endif
 
 namespace NATS.Client.Services;
 
@@ -24,21 +27,23 @@ public class NatsSvcServer : INatsSvcServer
     private readonly ConcurrentDictionary<string, NatsSvcEndpointBase> _endPoints = new();
     private readonly string _started;
     private readonly CancellationTokenSource _cts;
+    private readonly CancellationToken _creationToken;
 
     /// <summary>
     /// Creates a new instance of <see cref="NatsSvcServer"/>.
     /// </summary>
     /// <param name="nats">NATS connection.</param>
     /// <param name="config">Service configuration.</param>
-    /// <param name="cancellationToken">Not used. The service runs until <see cref="StopAsync"/> or <see cref="DisposeAsync"/> is called.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the service creation requests. It does not affect the running service, which runs until <see cref="StopAsync"/> or <see cref="DisposeAsync"/> is called.</param>
     public NatsSvcServer(INatsConnection nats, NatsSvcConfig config, CancellationToken cancellationToken)
     {
         _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcServer>();
         _id = Nuid.NewNuid();
         _nats = nats;
         _config = config;
+        _creationToken = cancellationToken;
 
-        // Not linked to the caller's token: that token also ended the discovery listeners
+        // Not linked to the creation token: that token also ended the discovery listeners
         // and made StopAsync a no-op, while the endpoints kept serving.
         _cts = new CancellationTokenSource();
         _channel = Channel.CreateBounded<SvcMsg>(32);
@@ -200,20 +205,59 @@ public class NatsSvcServer : INatsSvcServer
         GC.SuppressFinalize(this);
     }
 
+    // The creation token bounds this call only. The listeners subscribe with _cts, the
+    // service's own lifetime token, so the creation token is not passed down to them; a
+    // subscribe still waiting when the call is abandoned is ended by AbortStartAsync
+    // cancelling _cts.
     internal async ValueTask StartAsync()
     {
         var name = _config.Name;
+        var cancellationToken = _creationToken;
 
-        foreach (var svcType in new[] { SvcMsgType.Ping, SvcMsgType.Info, SvcMsgType.Stats })
+        try
         {
-            var type = svcType.ToString().ToUpper();
-            foreach (var subject in new[] { $"$SRV.{type}", $"$SRV.{type}.{name}", $"$SRV.{type}.{name}.{_id}" })
+            foreach (var svcType in new[] { SvcMsgType.Ping, SvcMsgType.Info, SvcMsgType.Stats })
             {
-                // for discovery subjects do not use a queue group
-                var svcListener = new SvcListener(_logger, _nats, _channel, svcType, subject, default, _cts.Token);
-                await svcListener.StartAsync();
-                _svcListeners.Add(svcListener);
+                var type = svcType.ToString().ToUpper();
+                foreach (var subject in new[] { $"$SRV.{type}", $"$SRV.{type}.{name}", $"$SRV.{type}.{name}.{_id}" })
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    // for discovery subjects do not use a queue group
+                    var svcListener = new SvcListener(_logger, _nats, _channel, svcType, subject, default, _cts.Token);
+                    _svcListeners.Add(svcListener);
+                    await svcListener.StartAsync().AsTask().WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
             }
+        }
+        catch
+        {
+            await AbortStartAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    // Undo a start that was cancelled or failed part way. The caller gets the exception
+    // and never sees the service, so nothing it started may stay subscribed.
+    private async ValueTask AbortStartAsync()
+    {
+        _cts.Cancel();
+        _channel.Writer.TryComplete();
+
+        foreach (var listener in _svcListeners)
+        {
+            await listener.DisposeAsync().ConfigureAwait(false);
+        }
+
+        _svcListeners.Clear();
+
+        try
+        {
+            await _taskMsgLoop.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // intentionally canceled
         }
     }
 

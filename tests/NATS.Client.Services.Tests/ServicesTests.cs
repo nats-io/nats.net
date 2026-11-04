@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
@@ -978,5 +979,50 @@ public class ServicesTests
             await nats.RequestAsync<int, int>("e1", 0, cancellationToken: cancellationToken));
         await Assert.ThrowsAsync<NatsNoRespondersException>(async () =>
             await nats.RequestAsync<string, string>("$SRV.PING.s1", "{}", cancellationToken: cancellationToken));
+    }
+
+    [Fact]
+    public async Task Add_service_with_cancelled_token_throws_and_leaves_nothing_subscribed()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        using var createCts = new CancellationTokenSource();
+        createCts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: createCts.Token));
+
+        await Assert.ThrowsAsync<NatsNoRespondersException>(async () =>
+            await nats.RequestAsync<string, string>("$SRV.PING.s1", "{}", cancellationToken: cancellationToken));
+    }
+
+    [Fact]
+    public async Task Add_service_token_interrupts_creation_while_connection_is_down()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        // Connection is now reconnecting, so the discovery subscribes wait for it to come back.
+        await server.StopAsync();
+        await Retry.Until("connection is not open", () => nats.ConnectionState != NatsConnectionState.Open);
+
+        using var createCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var stopwatch = Stopwatch.StartNew();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: createCts.Token));
+        stopwatch.Stop();
+
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(15), $"AddServiceAsync took {stopwatch.Elapsed}");
     }
 }
