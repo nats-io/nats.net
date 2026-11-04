@@ -817,11 +817,13 @@ public class NatsKVWatcherTest
 
         // Drop consumer create replies on their way to the client
         var dropped = 0;
+        string? droppedReply = null;
         proxy.ServerInterceptors.Add(m =>
         {
             if (m != null && m.Contains("consumer_create_response"))
             {
                 Interlocked.Increment(ref dropped);
+                Volatile.Write(ref droppedReply, m);
                 return null;
             }
 
@@ -856,10 +858,12 @@ public class NatsKVWatcherTest
             }
         });
 
-        // The server created the consumer, only the reply was lost
+        // The server created the consumer, only the reply was lost. Checked on the dropped
+        // reply rather than on the stream's consumer count, which the server may already
+        // have reduced by the time it is read.
         Assert.Equal(1, Volatile.Read(ref dropped));
+        Assert.DoesNotContain("\"error\"", Volatile.Read(ref droppedReply));
         var stream = await js1.GetStreamAsync($"KV_{bucket}", cancellationToken: cancellationToken);
-        Assert.Equal(1, stream.Info.State.ConsumerCount);
 
         // Once nothing is subscribed to its delivery subject the server deletes the
         // ephemeral consumer after its inactive threshold (5s)
