@@ -1,4 +1,5 @@
 using System.Buffers.Text;
+using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Tests;
 using NATS.Client.Core2.Tests;
@@ -876,5 +877,49 @@ public class NatsKVWatcherTest
             },
             timeout: TimeSpan.FromSeconds(20),
             retryDelay: TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task Watcher_dispose_completes_when_recreate_is_blocked()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cancellationToken = cts.Token;
+
+        await using var nats1 = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats1.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+        var bucket = $"{prefix}b1";
+        var store1 = await new NatsKVContext(new NatsJSContext(nats1)).CreateStoreAsync(bucket, cancellationToken: cancellationToken);
+        await store1.PutAsync("k1", 0, cancellationToken: cancellationToken);
+
+        // In Wait mode a full watcher command channel blocks the writer instead of dropping
+        await using var nats2 = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            SubPendingChannelCapacity = 1,
+            SubPendingChannelFullMode = BoundedChannelFullMode.Wait,
+        });
+        await nats2.ConnectRetryAsync();
+        var store2 = await new NatsKVContext(new NatsJSContext(nats2)).GetStoreAsync(bucket, cancellationToken: cancellationToken);
+
+        var opts = new NatsKVWatchOpts { IdleHeartbeat = TimeSpan.FromSeconds(1) };
+        var watch = store2.WatchAsync<int>("k1", opts: opts, cancellationToken: cancellationToken).GetAsyncEnumerator(cancellationToken);
+        Assert.True(await watch.MoveNextAsync());
+        Assert.Equal(0, watch.Current.Value);
+
+        // Stop reading and put more than the watcher's entry channel holds (1000), so the
+        // command loop blocks writing an entry and the command channel fills behind it
+        for (var i = 1; i <= 1100; i++)
+        {
+            await store1.PutAsync("k1", i, cancellationToken: cancellationToken);
+        }
+
+        // Nothing resets the heartbeat timer while the command loop is blocked, so it
+        // fires and queues a consumer recreate, which then blocks on the full command
+        // channel while registering its new subscription
+        await Task.Delay(TimeSpan.FromSeconds(4), cancellationToken);
+
+        // Dispose must release the blocked recreate rather than wait for it
+        await watch.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
     }
 }
