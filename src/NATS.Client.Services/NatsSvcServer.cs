@@ -54,41 +54,7 @@ public class NatsSvcServer : INatsSvcServer
         if (_cts.Token.IsCancellationRequested)
             return;
 
-        foreach (var listener in _svcListeners)
-        {
-            await listener.DisposeAsync();
-        }
-
-        // Drain buffers
-        // Ping only when connection is open, otherwise ping hangs waiting for reconnection.
-        // This is problematic when stopping a service during connection issues
-        // or if the server is stopped especially in a test environment.
-        if (_nats.ConnectionState == NatsConnectionState.Open)
-        {
-            // We're stopping, so timeout quickly in case connection state changes
-            // which means we don't care about flushing any buffers anymore
-            // it's just a best effort attempt
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, cancellationToken);
-            linkedCts.CancelAfter(_nats.Opts.ConnectTimeout);
-            await _nats.PingAsync(linkedCts.Token).ConfigureAwait(false);
-        }
-
-        foreach (var ep in _endPoints.Values)
-        {
-            await ep.DisposeAsync();
-        }
-
-        _channel.Writer.TryComplete();
-
-        _cts.Cancel();
-        try
-        {
-            await _taskMsgLoop;
-        }
-        catch (OperationCanceledException)
-        {
-            // intentionally canceled
-        }
+        await StopCoreAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -227,7 +193,7 @@ public class NatsSvcServer : INatsSvcServer
     /// </summary>
     public async ValueTask DisposeAsync()
     {
-        await StopAsync(_cts.Token);
+        await StopCoreAsync(_cts.Token);
         GC.SuppressFinalize(this);
     }
 
@@ -324,6 +290,49 @@ public class NatsSvcServer : INatsSvcServer
             {
                 _logger.LogError(ex, "Message loop error");
             }
+        }
+    }
+
+    /// <summary>
+    /// Single owner of the service shutdown sequence. The order below is an invariant:
+    /// endpoints are drained before the service channel is completed and before the
+    /// service token is cancelled, so that requests already being handled can still
+    /// finish and reply.
+    /// </summary>
+    private async ValueTask StopCoreAsync(CancellationToken cancellationToken)
+    {
+        foreach (var listener in _svcListeners)
+        {
+            await listener.DisposeAsync();
+        }
+
+        // Drain the endpoints: each endpoint unsubscribes, fences delivery with a
+        // PING/PONG round-trip and waits for its handler to finish, so requests
+        // that are already in flight are not dropped.
+        // This MUST happen before _cts.Cancel() below, otherwise the endpoint
+        // handler loop is cancelled before it can drain its channel.
+        foreach (var ep in _endPoints.Values)
+        {
+            try
+            {
+                await ep.DrainAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                await ep.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+
+        _channel.Writer.TryComplete();
+
+        _cts.Cancel();
+        try
+        {
+            await _taskMsgLoop;
+        }
+        catch (OperationCanceledException)
+        {
+            // intentionally canceled
         }
     }
 
