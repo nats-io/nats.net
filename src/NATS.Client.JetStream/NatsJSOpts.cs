@@ -95,6 +95,18 @@ public record NatsJSOrderedConsumerOpts
     /// Maximum number of attempts for the consumer to be recreated (Defaults to unlimited).
     /// </summary>
     public int MaxResetAttempts { get; init; } = -1;
+
+    /// <summary>
+    /// Optional prefix for the names of the consumers created on the server.
+    /// </summary>
+    /// <remarks>
+    /// When set, consumers are named <c>{NamePrefix}_{n}</c>, where <c>n</c> starts at 1 and
+    /// increments each time the consumer is recreated (e.g. <c>orders_1</c>, <c>orders_2</c>).
+    /// The prefix should be unique among ordered consumers active on the stream, and cannot
+    /// contain '.', '*', '>', '/', '\' or whitespace. When not set, a random name is generated
+    /// for each consumer.
+    /// </remarks>
+    public string? NamePrefix { get; init; }
 }
 
 /// <summary>

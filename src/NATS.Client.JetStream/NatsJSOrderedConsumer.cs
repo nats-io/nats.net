@@ -20,6 +20,7 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
     private readonly CancellationToken _cancellationToken;
     private ulong _fetchSeq;
     private string _fetchConsumerName = string.Empty;
+    private long _serial;
 
     /// <summary>
     /// Creates a new NATS JetStream ordered consumer.
@@ -437,12 +438,16 @@ public class NatsJSOrderedConsumer : INatsJSConsumer
             }
         }
 
+        var name = string.IsNullOrEmpty(_opts.NamePrefix)
+            ? Nuid.NewNuid()
+            : $"{_opts.NamePrefix}_{Interlocked.Increment(ref _serial)}";
+
         ConsumerInfo info;
         for (var i = 0; ; i++)
         {
             try
             {
-                info = await _context.CreateOrderedConsumerInternalAsync(_stream, consumerOpts, cancellationToken);
+                info = await _context.CreateOrderedConsumerInternalAsync(_stream, name, consumerOpts, cancellationToken);
                 break;
             }
             catch (NatsJSApiNoResponseException)

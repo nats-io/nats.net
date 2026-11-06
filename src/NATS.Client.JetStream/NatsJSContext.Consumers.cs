@@ -22,6 +22,11 @@ public partial class NatsJSContext : INatsJSContext
     {
         ThrowIfInvalidStreamName(stream);
         opts ??= NatsJSOrderedConsumerOpts.Default;
+        if (!string.IsNullOrEmpty(opts.NamePrefix) && opts.NamePrefix!.IndexOfAny(InvalidOrderedConsumerNamePrefixChars) >= 0)
+        {
+            throw new ArgumentException("Ordered consumer name prefix cannot contain '.', '*', '>', '/', '\\' or whitespace", nameof(opts.NamePrefix));
+        }
+
         return new ValueTask<INatsJSConsumer>(new NatsJSOrderedConsumer(stream, this, opts, cancellationToken));
     }
 
@@ -210,6 +215,7 @@ public partial class NatsJSContext : INatsJSContext
 
     internal ValueTask<ConsumerInfo> CreateOrderedConsumerInternalAsync(
         string stream,
+        string name,
         NatsJSOrderedConsumerOpts opts,
         CancellationToken cancellationToken)
     {
@@ -218,6 +224,7 @@ public partial class NatsJSContext : INatsJSContext
             StreamName = stream,
             Config = new ConsumerConfig
             {
+                Name = name,
                 DeliverPolicy = opts.DeliverPolicy,
                 AckPolicy = ConsumerConfigAckPolicy.None,
                 ReplayPolicy = opts.ReplayPolicy,
@@ -248,7 +255,6 @@ public partial class NatsJSContext : INatsJSContext
             request.Config.FilterSubjects = opts.FilterSubjects;
         }
 
-        var name = Nuid.NewNuid();
         var subject = $"{Opts.Prefix}.CONSUMER.CREATE.{stream}.{name}";
 
         return JSRequestResponseAsync<ConsumerCreateRequest, ConsumerInfo>(
