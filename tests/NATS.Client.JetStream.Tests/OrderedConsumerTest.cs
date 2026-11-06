@@ -567,4 +567,72 @@ public class OrderedConsumerTest
         Assert.True(consumed >= bailAt, $"consumed {consumed} should be >= {bailAt}");
         Assert.Equal(consumed - 1, Volatile.Read(ref lastSeq));
     }
+
+    [Fact]
+    public async Task Consume_uses_name_prefix()
+    {
+        await using var nats = _server.CreateNatsConnection();
+        await nats.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+
+        var js = new NatsJSContext(nats);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var stream = await js.CreateStreamAsync($"{prefix}s1", [$"{prefix}s1.*"], cts.Token);
+
+        for (var i = 0; i < 10; i++)
+        {
+            await js.PublishAsync($"{prefix}s1.foo", i, cancellationToken: cts.Token);
+        }
+
+        var namePrefix = $"{prefix}ordered";
+        var consumer = (NatsJSOrderedConsumer)await stream.CreateOrderedConsumerAsync(
+            new NatsJSOrderedConsumerOpts { NamePrefix = namePrefix },
+            cancellationToken: cts.Token);
+
+        var count = 0;
+        var consumeOpts = new NatsJSConsumeOpts
+        {
+            MaxMsgs = 3,
+            Expires = TimeSpan.FromSeconds(3),
+        };
+
+        await foreach (var msg in consumer.ConsumeAsync<int>(opts: consumeOpts, cancellationToken: cts.Token))
+        {
+            Assert.Equal(count, msg.Data);
+            count++;
+
+            if (count == 3)
+            {
+                Assert.Equal($"{namePrefix}_1", consumer.Info.Name);
+                await js.DeleteConsumerAsync($"{prefix}s1", consumer.Info.Name, cts.Token);
+            }
+
+            if (count == 10)
+                break;
+        }
+
+        // The consumer was recreated after deletion, so the serial moved on.
+        Assert.Equal($"{namePrefix}_2", consumer.Info.Name);
+    }
+
+    [Theory]
+    [InlineData("a.b")]
+    [InlineData("a*")]
+    [InlineData("a>")]
+    [InlineData("a/b")]
+    [InlineData("a\\b")]
+    [InlineData("a b")]
+    [InlineData("a\tb")]
+    [InlineData("a\rb")]
+    [InlineData("a\nb")]
+    public async Task Invalid_name_prefix_throws(string namePrefix)
+    {
+        await using var nats = new NatsConnection();
+        var js = new NatsJSContext(nats);
+
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await js.CreateOrderedConsumerAsync("s1", new NatsJSOrderedConsumerOpts { NamePrefix = namePrefix }));
+    }
 }

@@ -14,6 +14,9 @@ public partial class NatsJSContext
 {
     private static readonly char[] InvalidConsumerNameChars = { '.', '*', '>' };
 
+    // Matches the characters nats.go rejects in consumer names.
+    private static readonly char[] InvalidOrderedConsumerNamePrefixChars = { '.', '*', '>', '/', '\\', ' ', '\t', '\r', '\n' };
+
     private readonly ILogger _logger;
 
     /// <inheritdoc cref="NatsJSContext(NATS.Client.Core.INatsConnection,NATS.Client.JetStream.NatsJSOpts)"/>>
