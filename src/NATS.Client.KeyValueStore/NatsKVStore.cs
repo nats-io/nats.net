@@ -174,7 +174,7 @@ public class NatsKVStore : INatsKVStore
 
         // First try to create a new entry
         var resultUpdate = await TryUpdateInternalAsync(key, value, revision: 0, ttl, serializer, cancellationToken);
-        if (resultUpdate.Success)
+        if (resultUpdate.Success || resultUpdate.Error is not NatsKVWrongLastRevisionException)
         {
             return resultUpdate;
         }
@@ -187,15 +187,16 @@ public class NatsKVStore : INatsKVStore
         {
             return new NatsKVCreateException();
         }
-        else if (resultReadExisting.Error is NatsKVKeyDeletedException deletedException)
+
+        // If our previous call errored because the last entry is deleted, then that's ok, we update with the deleted revision
+        if (resultReadExisting.Error is NatsKVKeyDeletedException or NatsKVKeyNotFoundException)
         {
-            // If our previous call errored because the last entry is deleted, then that's ok, we update with the deleted revision
-            return await TryUpdateInternalAsync(key, value, deletedException.Revision, ttl, serializer, cancellationToken);
+            var revision = (resultReadExisting.Error as NatsKVKeyDeletedException)?.Revision;
+            var resultUpdateDeleted = await TryUpdateInternalAsync(key, value, revision ?? 0, ttl, serializer, cancellationToken);
+            return !resultUpdateDeleted.Success && resultUpdateDeleted.Error is NatsKVWrongLastRevisionException ? new NatsKVCreateException() : resultUpdateDeleted;
         }
-        else
-        {
-            return resultReadExisting.Error;
-        }
+
+        return resultReadExisting.Error;
     }
 
     /// <inheritdoc />
