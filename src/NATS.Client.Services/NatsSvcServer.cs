@@ -221,7 +221,7 @@ public class NatsSvcServer : INatsSvcServer
         var epSubject = subject ?? name ?? throw new NatsSvcException("Either name or subject must be specified");
         var epName = name ?? epSubject.Replace(".", "-");
 
-        var ep = new NatsSvcEndpoint<T>(_nats, queueGroup, epName, handler, epSubject, metadata, serializer, opts: default, cancellationToken);
+        var ep = new NatsSvcEndpoint<T>(_nats, queueGroup, epName, handler, epSubject, metadata, serializer, opts: default, concurrency: _config.EndpointConcurrency, cancellationToken);
 
         if (!_endPoints.TryAdd(epName, ep))
         {

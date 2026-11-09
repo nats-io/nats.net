@@ -11,6 +11,8 @@ public record NatsSvcConfig
     private static readonly Regex NameRegex = new(@"^[a-zA-Z0-9_-]+$", RegexOptions.Compiled);
     private static readonly Regex VersionRegex = new(@"^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)(?:-(?<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$", RegexOptions.Compiled);
 
+    private readonly int _endpointConcurrency = 1;
+
     /// <summary>
     /// Creates a new instance of <see cref="NatsSvcConfig"/>.
     /// </summary>
@@ -69,4 +71,29 @@ public record NatsSvcConfig
     /// the service stats <c>data</c> property.
     /// </summary>
     public Func<INatsSvcEndpoint, JsonNode>? StatsHandler { get; init; }
+
+    /// <summary>
+    /// Maximum number of requests each endpoint of the service handles at the same time. (default: <c>1</c>)
+    /// </summary>
+    /// <remarks>
+    /// By default an endpoint handles its requests one at a time, in the order they are received.
+    /// When set to a value greater than <c>1</c>, each endpoint runs up to that many handlers
+    /// concurrently, so handlers must be safe to run in parallel and requests may complete
+    /// in a different order than they were received. Endpoint stats still count every request,
+    /// and stopping the service or removing an endpoint still waits for all handlers in flight.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">The value is less than <c>1</c>.</exception>
+    public int EndpointConcurrency
+    {
+        get => _endpointConcurrency;
+        init
+        {
+            if (value < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(EndpointConcurrency), value, "Endpoint concurrency must be at least 1.");
+            }
+
+            _endpointConcurrency = value;
+        }
+    }
 }
