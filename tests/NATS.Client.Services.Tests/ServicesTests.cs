@@ -372,6 +372,217 @@ public class ServicesTests
     }
 
     [Fact]
+    public async Task End_point_handles_requests_one_at_a_time_by_default()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        var started = 0;
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandler = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m =>
+            {
+                if (Interlocked.Increment(ref started) == 1)
+                    firstStarted.TrySetResult();
+
+                await releaseHandler.Task.WaitAsync(cancellationToken);
+                await m.ReplyAsync(m.Data * m.Data, cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
+
+        var replyTasks = Enumerable.Range(0, 2)
+            .Select(i => nats.RequestAsync<int, int>("e1", i, cancellationToken: cancellationToken).AsTask())
+            .ToList();
+
+        await firstStarted.Task.WaitAsync(cancellationToken);
+
+        // The second request must wait until the first handler is done.
+        await Task.Delay(500, cancellationToken);
+        Assert.Equal(1, Volatile.Read(ref started));
+
+        releaseHandler.SetResult();
+
+        var replies = await Task.WhenAll(replyTasks);
+        Assert.Equal(new[] { 0, 1 }, replies.Select(r => r.Data));
+        Assert.Equal(2, Volatile.Read(ref started));
+    }
+
+    [Fact]
+    public async Task End_point_handles_requests_concurrently_when_opted_in()
+    {
+        const int concurrency = 4;
+        const int requests = concurrency + 2;
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        await using var s1 = await svc.AddServiceAsync(new NatsSvcConfig("s1", "1.0.0") { EndpointConcurrency = concurrency }, cancellationToken);
+
+        var started = 0;
+        var allStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandlers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m =>
+            {
+                if (Interlocked.Increment(ref started) == concurrency)
+                    allStarted.TrySetResult();
+
+                await releaseHandlers.Task.WaitAsync(cancellationToken);
+                await m.ReplyAsync(m.Data * m.Data, cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
+
+        var replyTasks = Enumerable.Range(0, requests)
+            .Select(i => nats.RequestAsync<int, int>("e1", i, cancellationToken: cancellationToken).AsTask())
+            .ToList();
+
+        // Handled one at a time, the handlers would never all be running together.
+        await allStarted.Task.WaitAsync(cancellationToken);
+
+        // The endpoint never runs more handlers at once than it is allowed to:
+        // the remaining requests wait for a handler to finish.
+        await Task.Delay(500, cancellationToken);
+        Assert.Equal(concurrency, Volatile.Read(ref started));
+
+        releaseHandlers.SetResult();
+
+        var replies = await Task.WhenAll(replyTasks);
+        Assert.Equal(Enumerable.Range(0, requests).Select(i => i * i), replies.Select(r => r.Data));
+        Assert.Equal(requests, Volatile.Read(ref started));
+    }
+
+    [Fact]
+    public async Task End_point_stats_are_correct_when_handling_requests_concurrently()
+    {
+        const int requests = 20;
+        var delay = TimeSpan.FromMilliseconds(100);
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        await using var s1 = await svc.AddServiceAsync(new NatsSvcConfig("s1", "1.0.0") { EndpointConcurrency = 4 }, cancellationToken);
+
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m =>
+            {
+                await Task.Delay(delay, cancellationToken);
+
+                if (m.Data % 5 == 0)
+                    throw new NatsSvcEndpointException(500, $"Error{m.Data}");
+
+                await m.ReplyAsync(m.Data * m.Data, cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
+
+        var replies = await Task.WhenAll(Enumerable.Range(0, requests)
+            .Select(i => nats.RequestAsync<int, int>("e1", i, cancellationToken: cancellationToken).AsTask()));
+
+        // A failing handler is answered with its error and does not stop the others.
+        for (var i = 0; i < requests; i++)
+        {
+            if (i % 5 == 0)
+            {
+                Assert.Equal("500", replies[i].Headers?["Nats-Service-Error-Code"]);
+                Assert.Equal($"Error{i}", replies[i].Headers?["Nats-Service-Error"]);
+            }
+            else
+            {
+                Assert.Equal(i * i, replies[i].Data);
+            }
+        }
+
+        // Stopping waits for every handler, so the stats below are final.
+        await s1.StopAsync(cancellationToken);
+
+        var stats = Assert.Single(s1.GetStats().Endpoints);
+        Assert.Equal(requests, stats.NumRequests);
+        Assert.Equal(requests / 5, stats.NumErrors);
+
+        // Processing time adds up the time spent in each handler, even when they overlap,
+        // so it is well above the wall-clock time of about requests / 4 * delay.
+        var minNanos = (long)(requests * delay.TotalMilliseconds / 2 * 1_000_000);
+        Assert.True(stats.ProcessingTime >= minNanos, $"ProcessingTime {stats.ProcessingTime} < {minNanos}");
+        Assert.True(stats.AverageProcessingTime >= minNanos / requests, $"AverageProcessingTime {stats.AverageProcessingTime} < {minNanos / requests}");
+    }
+
+    [Fact]
+    public async Task Stop_service_waits_for_concurrent_handlers()
+    {
+        const int concurrency = 3;
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        var s1 = await svc.AddServiceAsync(new NatsSvcConfig("s1", "1.0.0") { EndpointConcurrency = concurrency }, cancellationToken);
+
+        var started = 0;
+        var allStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandlers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m =>
+            {
+                if (Interlocked.Increment(ref started) == concurrency)
+                    allStarted.TrySetResult();
+
+                await releaseHandlers.Task.WaitAsync(cancellationToken);
+                await m.ReplyAsync(m.Data * m.Data, cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
+
+        var replyTasks = Enumerable.Range(0, concurrency)
+            .Select(i => nats.RequestAsync<int, int>("e1", i, cancellationToken: cancellationToken).AsTask())
+            .ToList();
+
+        await allStarted.Task.WaitAsync(cancellationToken);
+
+        // All handlers are in flight, so stopping must wait for every one of them.
+        var stopTask = s1.StopAsync(cancellationToken).AsTask();
+        Assert.False(stopTask.IsCompleted);
+
+        releaseHandlers.SetResult();
+
+        await stopTask;
+        var replies = await Task.WhenAll(replyTasks);
+        Assert.Equal(Enumerable.Range(0, concurrency).Select(i => i * i), replies.Select(r => r.Data));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Endpoint_concurrency_must_be_at_least_one(int concurrency) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => new NatsSvcConfig("s1", "1.0.0") { EndpointConcurrency = concurrency });
+
+    [Fact]
     public async Task Stop_service_without_end_points_does_not_throw()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
