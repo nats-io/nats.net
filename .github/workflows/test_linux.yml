@@ -18,6 +18,7 @@ jobs:
         config:
           - branch: 'v2.11'
           - branch: 'v2.12'
+          - branch: 'v2.14'
           - branch: 'latest'
           - branch: 'main'
     runs-on: ubuntu-latest
