@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -584,36 +585,48 @@ public class RequestReplyTest
     [Fact]
     public async Task Direct_request_issued_as_soon_as_connection_opens_gets_reply()
     {
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-        var cancellationToken = cts.Token;
         var subject = $"{_server.GetNextId()}.echo";
 
+        // Setup gets its own timeout; the responder runs until the loop is done.
+        using var setupCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var responderCts = new CancellationTokenSource();
+
         await using var responder = new NatsConnection(new NatsOpts { Url = _server.Url });
-        await using var sub = await responder.SubscribeCoreAsync<int>(subject, cancellationToken: cancellationToken);
-        var reg = sub.Register(async msg => await msg.ReplyAsync(msg.Data, cancellationToken: cancellationToken));
-        await responder.PingAsync(cancellationToken);
+        await using var sub = await responder.SubscribeCoreAsync<int>(subject, cancellationToken: setupCts.Token);
+        var reg = sub.Register(async msg => await msg.ReplyAsync(msg.Data, cancellationToken: responderCts.Token));
+        await responder.PingAsync(setupCts.Token);
 
         var replyOpts = new NatsSubOpts { Timeout = TimeSpan.FromSeconds(2) };
+        var total = Stopwatch.StartNew();
 
         for (var i = 0; i < 1000; i++)
         {
-            await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.Direct });
-
-            // Spin until the connection reports Open, then request at once. The reply
-            // inbox must already be subscribed by then, otherwise the reply is lost.
-            var connect = Task.Run(async () => await nats.ConnectAsync(), cancellationToken);
-            while (nats.ConnectionState != NatsConnectionState.Open)
+            // Per-iteration budget, so one slow connect cannot starve the rest of the loop.
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var iteration = Stopwatch.StartNew();
+            try
             {
-                if (connect.IsCompleted)
-                    await connect; // surfaces a failed connect instead of spinning until the timeout
-                cancellationToken.ThrowIfCancellationRequested();
-            }
+                await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, RequestReplyMode = NatsRequestReplyMode.Direct });
 
-            var reply = await nats.RequestAsync<int, int>(subject, i, replyOpts: replyOpts, cancellationToken: cancellationToken);
-            Assert.Equal(i, reply.Data);
-            await connect;
+                // Issue the request while the connection is still opening. It waits for Open
+                // and is published straight after, so the reply inbox must already be
+                // subscribed by then, otherwise the reply is lost.
+                var connect = nats.ConnectAsync().AsTask();
+                var reply = await nats.RequestAsync<int, int>(subject, i, replyOpts: replyOpts, cancellationToken: cts.Token);
+                Assert.Equal(i, reply.Data);
+                await connect;
+            }
+            catch (Exception e)
+            {
+                var message = $"Iteration {i} failed after {iteration.Elapsed.TotalMilliseconds:F0} ms ({total.Elapsed.TotalMilliseconds:F0} ms into the loop): {e.GetType().Name}: {e.Message}";
+                _output.WriteLine(message);
+                throw new Exception(message, e);
+            }
         }
 
+        _output.WriteLine($"1000 iterations in {total.Elapsed.TotalMilliseconds:F0} ms");
+
+        responderCts.Cancel();
         await sub.UnsubscribeAsync();
         await reg;
     }
