@@ -50,6 +50,9 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
     private long _pendingMsgs;
     private long _pendingBytes;
     private int _consecutive503Errors;
+    private bool _consumerHasReplied;
+    private int _quickRepulls;
+    private bool _awaitingQuickRepull;
     private volatile bool _draining;
 
     public NatsJSConsume(
@@ -400,6 +403,12 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                         }
                     }
 
+                    // The 503 of a quick re-pull (see below) doesn't count, so the limit isn't reached any sooner for them
+                    var repliesToQuickRepull = _awaitingQuickRepull;
+                    _awaitingQuickRepull = false;
+                    if (headers.Code != 503)
+                        _consumerHasReplied = true;
+
                     if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
                     {
                     }
@@ -427,8 +436,12 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                     }
                     else if (headers.Code == 503)
                     {
-                        _consecutive503Errors++;
-                        _logger.LogDebug(NatsJSLogEvents.NoResponders, "503 no responders (count: {Count})", _consecutive503Errors);
+                        if (!repliesToQuickRepull)
+                        {
+                            _consecutive503Errors++;
+                            _logger.LogDebug(NatsJSLogEvents.NoResponders, "503 no responders (count: {Count})", _consecutive503Errors);
+                        }
+
                         _notificationChannel?.Notify(NatsJSNoRespondersNotification.Default);
                         ResetPending();
 
@@ -439,6 +452,16 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
                             _logger.LogWarning(NatsJSLogEvents.NoResponders, "Consumer appears to be deleted after {Count} consecutive 503 errors", _consecutive503Errors);
                             _userMsgs.Writer.TryComplete(new NatsJSException($"Consumer appears to be deleted after {_consecutive503Errors} consecutive 503 errors"));
                             EndSubscription(NatsSubEndReason.JetStreamError);
+                        }
+                        else if (!_consumerHasReplied && NatsJSOptsDefaults.TryGetNoRespondersQuickRepullDelay(++_quickRepulls, _idle, out var delay))
+                        {
+                            // A pull to a just-created consumer can race the propagation of its interest across the cluster.
+                            // Until the consumer has replied, pull again shortly rather than wait for the heartbeat timer;
+                            // after that, a 503 is left to the timer as before. Until then, nothing else pulls (pending is
+                            // at its max, and the delay is within the heartbeat timer's), so this is the only pull out.
+                            _logger.LogDebug(NatsJSLogEvents.NoResponders, "503 no responders before the consumer replied; pulling again in {Delay}", delay);
+                            _awaitingQuickRepull = true;
+                            RepullAfter(delay);
                         }
                     }
                     else if (headers.HasTerminalJSError())
@@ -472,6 +495,8 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         {
             // Reset 503 error counter on successful message
             _consecutive503Errors = 0;
+            _consumerHasReplied = true;
+            _awaitingQuickRepull = false;
 
             var msg = new NatsJSMsg<TMsg>(
                 NatsMsg<TMsg>.BuildInternal(
@@ -586,6 +611,22 @@ internal class NatsJSConsume<TMsg> : NatsSubBase
         },
         Origin = origin,
     });
+
+    // Not on the heartbeat timer, since that's reset from outside just after the first pull (in ConsumeInternalAsync),
+    // which a 503 can beat. Once disposed, the pull request channel is complete, so a late re-pull is dropped.
+    private void RepullAfter(TimeSpan delay) => Task.Delay(delay, _cancellationToken).ContinueWith(
+        static (delayTask, state) =>
+        {
+            var self = (NatsJSConsume<TMsg>)state!;
+
+            // As for the heartbeat timer's pulls, none once draining or while not connected
+            if (!delayTask.IsCanceled && !self._draining && self.Connection.ConnectionState == NatsConnectionState.Open)
+                self.Pull("503-quick-repull", self._maxMsgs, self._maxBytes);
+        },
+        this,
+        CancellationToken.None,
+        TaskContinuationOptions.ExecuteSynchronously,
+        TaskScheduler.Default);
 
     private async Task PullLoop()
     {
