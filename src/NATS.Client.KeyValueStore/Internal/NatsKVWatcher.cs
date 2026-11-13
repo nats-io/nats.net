@@ -149,22 +149,34 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
     {
         _nats.ConnectionDisconnected -= OnDisconnected;
 
-        if (_sub != null)
-        {
-            await _sub.DisposeAsync();
-        }
-
+        // Stop everything that can install a new subscription before disposing the current
+        // one: the heartbeat timer, and a recreate already queued or in flight in
+        // ConsumerCreateLoop. Otherwise a recreate overlapping dispose leaves its new
+        // subscription, and the consumer bound to it, behind.
 #if NETSTANDARD2_0
         _timer.Dispose();
 #else
         await _timer.DisposeAsync().ConfigureAwait(false);
 #endif
-
         _consumerCreateChannel.Writer.TryComplete();
-        _commandChannel.Writer.TryComplete();
-        _entryChannel.Writer.TryComplete();
         await _consumerCreateTask;
-        await _commandTask;
+
+        try
+        {
+            if (_sub != null)
+            {
+                await _sub.DisposeAsync();
+            }
+        }
+        finally
+        {
+            // Unsubscribe can fail, for example when a stalled command writer times out.
+            // The loops must still be ended or the watcher keeps running after the caller
+            // has let go of it.
+            _commandChannel.Writer.TryComplete();
+            _entryChannel.Writer.TryComplete();
+            await _commandTask;
+        }
     }
 
     internal async ValueTask InitAsync()

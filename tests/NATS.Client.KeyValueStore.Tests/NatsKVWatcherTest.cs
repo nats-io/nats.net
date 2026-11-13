@@ -782,4 +782,99 @@ public class NatsKVWatcherTest
             }
         });
     }
+
+    // When the consumer create reply is lost, the server has still created the consumer.
+    // The failed call must release its delivery subscription so the server can reap that
+    // ephemeral consumer, instead of leaving it alive for the life of the connection.
+    [Theory]
+    [InlineData("keys")]
+    [InlineData("watch")]
+    [InlineData("history")]
+    [InlineData("purge")]
+    public async Task Watcher_init_failure_releases_consumer(string api)
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cancellationToken = cts.Token;
+
+        await using var nats1 = new NatsConnection(new NatsOpts { Url = _server.Url });
+        await nats1.ConnectRetryAsync();
+        var prefix = _server.GetNextId();
+        var js1 = new NatsJSContext(nats1);
+        var kv1 = new NatsKVContext(js1);
+        var bucket = $"{prefix}b1";
+        var store1 = await kv1.CreateStoreAsync(bucket, cancellationToken: cancellationToken);
+        await store1.PutAsync("k1", 1, cancellationToken: cancellationToken);
+
+        var proxy = new NatsProxy(_server.Port);
+        await using var nats2 = new NatsConnection(new NatsOpts
+        {
+            Url = $"nats://127.0.0.1:{proxy.Port}",
+            RequestTimeout = TimeSpan.FromSeconds(1),
+        });
+        await nats2.ConnectRetryAsync();
+        var store2 = await new NatsKVContext(new NatsJSContext(nats2)).CreateStoreAsync(bucket, cancellationToken: cancellationToken);
+        Assert.Equal(1, (await store2.GetEntryAsync<int>("k1", cancellationToken: cancellationToken)).Value);
+
+        // Drop consumer create replies on their way to the client
+        var dropped = 0;
+        string? droppedReply = null;
+        proxy.ServerInterceptors.Add(m =>
+        {
+            if (m != null && m.Contains("consumer_create_response"))
+            {
+                Interlocked.Increment(ref dropped);
+                Volatile.Write(ref droppedReply, m);
+                return null;
+            }
+
+            return m;
+        });
+
+        await Assert.ThrowsAsync<NatsJSApiNoResponseException>(async () =>
+        {
+            switch (api)
+            {
+            case "keys":
+                await foreach (var unused in store2.GetKeysAsync(cancellationToken: cancellationToken))
+                {
+                }
+
+                break;
+            case "watch":
+                await foreach (var unused in store2.WatchAsync<int>(cancellationToken: cancellationToken))
+                {
+                }
+
+                break;
+            case "history":
+                await foreach (var unused in store2.HistoryAsync<int>("k1", cancellationToken: cancellationToken))
+                {
+                }
+
+                break;
+            default:
+                await store2.PurgeDeletesAsync(cancellationToken: cancellationToken);
+                break;
+            }
+        });
+
+        // The server created the consumer, only the reply was lost. Checked on the dropped
+        // reply rather than on the stream's consumer count, which the server may already
+        // have reduced by the time it is read.
+        Assert.Equal(1, Volatile.Read(ref dropped));
+        Assert.DoesNotContain("\"error\"", Volatile.Read(ref droppedReply));
+        var stream = await js1.GetStreamAsync($"KV_{bucket}", cancellationToken: cancellationToken);
+
+        // Once nothing is subscribed to its delivery subject the server deletes the
+        // ephemeral consumer after its inactive threshold (5s)
+        await Retry.Until(
+            reason: "orphaned consumer is deleted",
+            condition: async () =>
+            {
+                await stream.RefreshAsync(cancellationToken);
+                return stream.Info.State.ConsumerCount == 0;
+            },
+            timeout: TimeSpan.FromSeconds(20),
+            retryDelay: TimeSpan.FromSeconds(1));
+    }
 }
