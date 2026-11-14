@@ -807,12 +807,14 @@ public partial class NatsConnection : INatsConnection
 
         try
         {
+            Exception? disconnectError = null;
+
             try
             {
                 // wait for the current socket to complete or throw
                 await _socketConnection!.WaitForClosed.ConfigureAwait(false);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 // If the NatsConnection is disposed, WaitForClosed throws so stop reconnect-loop correctly
                 if (CheckDisposed())
@@ -820,7 +822,12 @@ public partial class NatsConnection : INatsConnection
                     return;
                 }
 
-                // otherwise ignore the exception and reconnect
+                // otherwise keep the cause for the disconnected event and reconnect.
+                // Cancellation means this side closed the socket, so there is no error to report.
+                if (ex is not OperationCanceledException)
+                {
+                    disconnectError = ex;
+                }
             }
 
             _logger.LogDebug(NatsLogEvents.Connection, "Reconnect loop connection closed [{ReconnectCount}]", reconnectCount);
@@ -838,7 +845,7 @@ public partial class NatsConnection : INatsConnection
             }
 
             // Invoke event after state changed
-            PushEvent(NatsEvent.ConnectionDisconnected, new NatsEventArgs(_currentConnectUri?.ToString() ?? string.Empty));
+            PushEvent(NatsEvent.ConnectionDisconnected, new NatsEventArgs(_currentConnectUri?.ToString() ?? string.Empty, disconnectError));
 
             // Cleanup current socket
             await DisposeSocketAsync(true).ConfigureAwait(false);

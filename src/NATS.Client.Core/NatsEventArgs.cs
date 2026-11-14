@@ -19,7 +19,19 @@ public class NatsEventArgs : EventArgs
 {
     public NatsEventArgs(string message) => Message = message;
 
+    public NatsEventArgs(string message, Exception? exception)
+    {
+        Message = message;
+        Exception = exception;
+    }
+
     public string Message { get; }
+
+    /// <summary>
+    /// The error that caused this event, if there is one. Set on <see cref="NatsConnection.ConnectionDisconnected"/>
+    /// when the connection was lost because of a socket or protocol error; <c>null</c> when the client closed the socket itself.
+    /// </summary>
+    public Exception? Exception { get; }
 }
 
 public class NatsMessageDroppedEventArgs : NatsEventArgs
