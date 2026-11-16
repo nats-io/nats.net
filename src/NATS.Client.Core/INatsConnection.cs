@@ -76,6 +76,11 @@ public interface INatsConnection : INatsClient
     /// <summary>
     /// Hook when socket is available.
     /// </summary>
+    /// <remarks>
+    /// Without handshake-first, the TLS upgrade happens after this hook, on the socket connection
+    /// it returns. When TLS is required, that must be an <see cref="INatsTlsUpgradeableSocketConnection"/>
+    /// or an <see cref="INatsTlsSocketConnection"/>; anything else fails the connection attempt.
+    /// </remarks>
     Func<INatsSocketConnection, ValueTask<INatsSocketConnection>>? OnSocketAvailableAsync { get; set; }
 
     /// <summary>
