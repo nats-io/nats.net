@@ -41,3 +41,19 @@ public interface INatsTlsUpgradeableSocketConnection : INatsSocketConnection
     /// </summary>
     Socket Socket { get; }
 }
+
+/// <summary>
+/// Represents a NATS socket connection that already provides TLS, set up by a custom
+/// <c>INatsSocketConnectionFactory</c> or an <c>OnSocketAvailableAsync</c> hook.
+/// </summary>
+/// <remarks>
+/// When TLS is required (a <c>tls://</c> or <c>wss://</c> URL, certificate or CA options, or
+/// TLS mode Require or Implicit), the client only uses a socket connection that it can upgrade
+/// to TLS itself (<see cref="INatsTlsUpgradeableSocketConnection"/>) or one that implements this
+/// interface. Any other socket connection fails the connection attempt instead of carrying
+/// credentials in plaintext. Implement this interface only if the connection is TLS with the
+/// server's certificate verified.
+/// </remarks>
+public interface INatsTlsSocketConnection : INatsSocketConnection
+{
+}

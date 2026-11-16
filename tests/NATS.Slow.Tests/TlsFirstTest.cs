@@ -61,7 +61,7 @@ public class TlsFirstTest
 
             var exception = await Assert.ThrowsAsync<NatsException>(async () => await nats.ConnectAsync());
 
-            Assert.Matches(@"can not start to connect nats server", exception.Message);
+            Assert.Matches(@"can not connect uris", exception.Message);
 
             _output.WriteLine($"Implicit TLS connection rejected");
         }

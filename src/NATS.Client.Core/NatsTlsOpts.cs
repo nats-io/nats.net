@@ -19,9 +19,11 @@ public enum TlsMode
 {
     /// <summary>
     /// For connections that use the "nats://" scheme and don't supply Client or CA Certificates - same as <see cref="Prefer"/>.
-    /// For connections that use the "tls://" scheme or supply Client or CA Certificates - same as <see cref="Require"/>.
+    /// For connections that use the "tls://" or "wss://" scheme or supply Client or CA Certificates - same as <see cref="Require"/>.
     /// </summary>
     /// <remarks>
+    /// A "tls://" or "wss://" URL among the configured servers makes this <see cref="Require"/>
+    /// for every server, configured or discovered. Set <see cref="Prefer"/> to keep each URL as written.
     /// When this resolves to <see cref="Prefer"/>, TLS is opportunistic: the connection
     /// may remain plaintext depending on the server's INFO response.
     /// Use the <c>tls://</c> scheme or set <see cref="Require"/> explicitly when TLS is required.
@@ -44,6 +46,7 @@ public enum TlsMode
     /// </para>
     /// <para>
     /// If TLS is required, use the <c>tls://</c> scheme or set <see cref="TlsMode.Require"/> explicitly.
+    /// A <c>tls://</c> or <c>wss://</c> URL is always connected to with TLS, also in this mode.
     /// </para>
     /// </remarks>
     Prefer,
@@ -158,17 +161,17 @@ public sealed record NatsTlsOpts
         }
     }
 
-    internal TlsMode EffectiveMode(Uri uri) => Mode switch
+    internal static bool IsTlsScheme(Uri uri)
+        => string.Equals(uri.Scheme, "tls", StringComparison.OrdinalIgnoreCase) || string.Equals(uri.Scheme, "wss", StringComparison.OrdinalIgnoreCase);
+
+    // tlsUrlConfigured: a tls:// or wss:// URL is among the configured servers. In Auto mode
+    // it asks for TLS for every server. Prefer is the opt-out, but never for such a URL itself.
+    internal TlsMode EffectiveMode(Uri uri, bool tlsUrlConfigured = false) => Mode switch
     {
-        TlsMode.Auto => HasTlsCerts || uri.Scheme.ToLower() == "tls" ? TlsMode.Require : TlsMode.Prefer,
+        TlsMode.Auto => HasTlsCerts || tlsUrlConfigured || IsTlsScheme(uri) ? TlsMode.Require : TlsMode.Prefer,
+        TlsMode.Prefer => IsTlsScheme(uri) ? TlsMode.Require : TlsMode.Prefer,
         _ => Mode,
     };
-
-    internal bool TryTls(Uri uri)
-    {
-        var effectiveMode = EffectiveMode(uri);
-        return effectiveMode is TlsMode.Require or TlsMode.Prefer;
-    }
 
     internal async ValueTask<SslClientAuthenticationOptions> AuthenticateAsClientOptionsAsync(Uri uri)
     {

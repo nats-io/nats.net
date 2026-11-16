@@ -24,6 +24,9 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
     private readonly Encoding _subjectEncoding;
     private readonly bool _trace;
     private readonly int _maxPayloadHardCap;
+    private readonly object _detachGate = new();
+    private bool _infoReceived;
+    private bool _detached;
     private int _disposed;
 
     public NatsReadProtocolProcessor(SocketConnectionWrapper socketConnection, NatsConnection connection, TaskCompletionSource waitForInfoSignal, TaskCompletionSource waitForPongOrErrorSignal, Task infoParsed)
@@ -37,6 +40,10 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
         _waitForInfoSignal = waitForInfoSignal;
         _waitForPongOrErrorSignal = waitForPongOrErrorSignal;
         _infoParsed = infoParsed;
+
+        // After a TLS upgrade this reader takes over a connection whose INFO was already
+        // received, in plaintext, by the reader before it.
+        _infoReceived = waitForInfoSignal.Task.IsCompleted;
         _pingCommands = new ConcurrentQueue<PingCommand>();
         _socketReader = new SocketReader(socketConnection, connection.Opts.ReaderBufferSize, connection.Counter, connection.Opts.LoggerFactory);
         _readLoop = Task.Run(ReadLoopAsync);
@@ -48,6 +55,17 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
             return false;
         _pingCommands.Enqueue(ping);
         return true;
+    }
+
+    // The connection lets go of this reader. What it has buffered is still drained, but an
+    // INFO in there is from a connection that is gone: it must not change the server info or
+    // the server list of the connection that comes next.
+    public void Detach()
+    {
+        lock (_detachGate)
+        {
+            _detached = true;
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -169,6 +187,14 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                         }
 
                         code = GetCode(buffer);
+                    }
+
+                    // The server always sends INFO first (nats.go: ErrNoInfoReceived). Anything
+                    // before it didn't come from the server we are about to authenticate, e.g.
+                    // a MSG an on-path attacker prepended to the plaintext INFO.
+                    if (!_infoReceived && code != ServerOpCodes.Info)
+                    {
+                        NatsProtocolViolationException.Throw("Expected INFO as the first message from the server");
                     }
 
                     Interlocked.Increment(ref _connection.Counter.ReceivedMessages);
@@ -472,19 +498,13 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 var newPosition = newBuffer.PositionOf((byte)'\n');
 
                 var serverInfo = ParseInfo(newBuffer);
-                _connection.WritableServerInfo = serverInfo;
-                _logger.LogInformation(NatsLogEvents.Protocol, "Received server info: {ServerInfo}", serverInfo);
-                _waitForInfoSignal.TrySetResult();
-                await _infoParsed.ConfigureAwait(false);
+                await ProcessInfoAsync(serverInfo).ConfigureAwait(false);
                 return newBuffer.Slice(newBuffer.GetPosition(1, newPosition!.Value));
             }
             else
             {
                 var serverInfo = ParseInfo(buffer);
-                _connection.WritableServerInfo = serverInfo;
-                _logger.LogInformation(NatsLogEvents.Protocol, "Received server info: {ServerInfo}", serverInfo);
-                _waitForInfoSignal.TrySetResult();
-                await _infoParsed.ConfigureAwait(false);
+                await ProcessInfoAsync(serverInfo).ConfigureAwait(false);
                 return buffer.Slice(buffer.GetPosition(1, position.Value));
             }
         }
@@ -507,6 +527,33 @@ internal sealed class NatsReadProtocolProcessor : IAsyncDisposable
                 return buffer.Slice(buffer.GetPosition(1, position.Value));
             }
         }
+    }
+
+    private async ValueTask ProcessInfoAsync(ServerInfo serverInfo)
+    {
+        var first = !_infoReceived;
+        _infoReceived = true;
+
+        lock (_detachGate)
+        {
+            if (_detached)
+            {
+                _logger.LogDebug(NatsLogEvents.Protocol, "Ignored server info from a closed connection");
+                return;
+            }
+
+            _connection.WritableServerInfo = serverInfo;
+
+            // The first INFO of a connection may come in plaintext before a TLS upgrade: the
+            // connection decides what to do with its connect_urls. Any later one came over the
+            // connection's final transport.
+            if (!first)
+                _connection.OnAsyncInfo(serverInfo);
+        }
+
+        _logger.LogInformation(NatsLogEvents.Protocol, "Received server info: {ServerInfo}", serverInfo);
+        _waitForInfoSignal.TrySetResult();
+        await _infoParsed.ConfigureAwait(false);
     }
 
     // https://docs.nats.io/reference/reference-protocols/nats-protocol#msg

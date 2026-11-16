@@ -308,8 +308,11 @@ public sealed record NatsOpts
     /// Factory for creating socket connections to the NATS server.
     /// When set, this factory will be used instead of the default connection implementation.
     /// For the library to handle TLS upgrade automatically, implement the <see cref="INatsTlsUpgradeableSocketConnection"/> interface.
+    /// If the factory sets up TLS itself, implement <see cref="INatsTlsSocketConnection"/> instead: when TLS is required,
+    /// a socket connection that implements neither fails the connection attempt.
     /// </summary>
     /// <seealso cref="INatsTlsUpgradeableSocketConnection"/>
+    /// <seealso cref="INatsTlsSocketConnection"/>
     public INatsSocketConnectionFactory? SocketConnectionFactory { get; init; }
 
     /// <summary>

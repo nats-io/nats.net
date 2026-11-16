@@ -273,13 +273,23 @@ public abstract partial class NatsConnectionTest
 
         var subject = Guid.NewGuid().ToString();
 
-        await using var connection1 = await cluster.Server1.CreateClientConnectionAsync();
+        // With TLS after INFO the servers listed in the plaintext INFO are not used, and
+        // servers before 2.12 don't list them again over TLS: configure all three.
+        await using var connection1 = _transportType == TransportType.Tls
+            ? new NatsConnection(cluster.Server1.ClientOpts(NatsOpts.Default) with
+            {
+                Url = $"{cluster.Server1.ClientUrl},{cluster.Server2.ClientUrl},{cluster.Server3.ClientUrl}",
+                NoRandomize = true,
+            })
+            : await cluster.Server1.CreateClientConnectionAsync();
         await using var connection2 = await cluster.Server2.CreateClientConnectionAsync();
         await using var connection3 = await cluster.Server3.CreateClientConnectionAsync();
 
         await connection1.ConnectAsync();
         await connection2.ConnectAsync();
         await connection3.ConnectAsync();
+
+        connection1.ServerInfo!.Port.Should().Be(cluster.Server1.ConnectionPort);
 
         _output.WriteLine("Server1 ClientConnectUrls:" +
                           string.Join(", ", connection1.ServerInfo?.ClientConnectUrls ?? Array.Empty<string>()));

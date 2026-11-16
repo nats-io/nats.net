@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Diagnostics;
 using System.Net.Sockets;
+using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core.Commands;
@@ -55,8 +56,15 @@ public partial class NatsConnection : INatsConnection
     private readonly ReplyTaskFactory _replyTaskFactory;
     private readonly object _drainParticipantsGate = new();
     private readonly HashSet<NatsSubBase> _drainParticipants = new();
+    private readonly object _connectUrlsGate = new();
 
     private ServerInfo? _writableServerInfo;
+
+    // Servers learned from INFO connect_urls, each with the scheme of the connection it was
+    // learned on. The connect_urls of a plaintext INFO received before a TLS upgrade are not used.
+    private (string Entry, string Scheme)[]? _discoveredServers;
+    private bool _currentConnectionTls;
+    private bool? _tlsUrlConfigured;
     private KeyValuePair<string, object?>[]? _metricTagsPrefix;
     private object? _boxedServerPort;
     private string? _serverHost;
@@ -231,6 +239,10 @@ public partial class NatsConnection : INatsConnection
     /// </summary>
     public async ValueTask ConnectAsync()
     {
+        // A configuration that can never connect fails here, outside the retry loop:
+        // RetryOnInitialConnect would otherwise retry it forever without a word.
+        ThrowIfTlsMisconfigured();
+
         while (true)
         {
             try
@@ -491,17 +503,29 @@ public partial class NatsConnection : INatsConnection
     internal void PushEvent(NatsEvent @event, NatsEventArgs args)
         => _eventChannel.Writer.TryWrite((@event, args));
 
+    // An INFO after the first one of its connection: it came over the connection's final
+    // transport (TLS if there is TLS) and is what the server itself says.
+    internal void OnAsyncInfo(ServerInfo info) => SetDiscoveredServers(info.ClientConnectUrls);
+
+    private void ThrowIfTlsMisconfigured()
+    {
+        foreach (var uri in Opts.GetSeedUris(suppressRandomization: true))
+        {
+            var tlsMode = EffectiveTlsMode(uri.Uri);
+            if (tlsMode == TlsMode.Disable && NatsTlsOpts.IsTlsScheme(uri.Uri))
+                throw new NatsException($"URI {uri} requires TLS but TlsMode is set to Disable");
+
+            // TLS can't be added to a ws:// connection later, the scheme decides it
+            if (tlsMode is TlsMode.Require or TlsMode.Implicit && Opts.SocketConnectionFactory == null && uri.Uri.Scheme == "ws")
+                throw new NatsException($"TLS is required ({TlsRequiredReason(uri.Uri)}) but {uri} is a plaintext websocket URL: use wss://");
+        }
+    }
+
     private async ValueTask InitialConnectAsync()
     {
         Debug.Assert(ConnectionState == NatsConnectionState.Connecting, "Connection state");
 
         var uris = Opts.GetSeedUris();
-
-        foreach (var uri in uris)
-        {
-            if (Opts.TlsOpts.EffectiveMode(uri.Uri) == TlsMode.Disable && uri.IsTls)
-                throw new NatsException($"URI {uri} requires TLS but TlsMode is set to Disable");
-        }
 
         try
         {
@@ -526,11 +550,13 @@ public partial class NatsConnection : INatsConnection
         }
 
         var attemptedUris = new List<NatsUri>();
+        var connected = false;
         foreach (var uri in uris)
         {
             try
             {
                 await ConnectSocketAsync(uri).ConfigureAwait(false);
+                connected = true;
                 break;
             }
             catch (Exception ex)
@@ -541,7 +567,7 @@ public partial class NatsConnection : INatsConnection
             }
         }
 
-        if (_socketConnection == null)
+        if (!connected)
         {
             var exception = new NatsException("can not connect uris: " + string.Join(",", attemptedUris.Select(x => x.ToString())));
             lock (_gate)
@@ -618,34 +644,82 @@ public partial class NatsConnection : INatsConnection
             }
         }
 
+        var tlsMode = EffectiveTlsMode(uri.Uri);
+        var tlsRequired = tlsMode is TlsMode.Require or TlsMode.Implicit;
+        if (tlsRequired && Opts.SocketConnectionFactory == null && uri.Uri.Scheme == "ws")
+            throw new NatsException($"TLS is required ({TlsRequiredReason(uri.Uri)}) but {uri} is a plaintext websocket URL: use wss://");
+
         var connectionFactory = Opts.SocketConnectionFactory ?? (uri.IsWebSocket ? WebSocketFactory.Default : TcpFactory.Default);
         _logger.LogInformation(NatsLogEvents.Connection, "Connect to NATS using {FactoryType} {Uri}", connectionFactory.GetType().Name, uri);
         using var timeoutCts = new CancellationTokenSource(Opts.ConnectTimeout);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(_disposedCts.Token, timeoutCts.Token);
+        INatsSocketConnection socketConnection;
         try
         {
-            var socketConnection = await connectionFactory.ConnectAsync(uri.Uri, Opts, cts.Token).ConfigureAwait(false);
-            _socketConnection = new SocketConnectionWrapper(socketConnection);
+            socketConnection = await connectionFactory.ConnectAsync(uri.Uri, Opts, cts.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
         {
             throw new SocketException(10060); // 10060 = connection timeout.
         }
 
-        if (Opts.TlsOpts.EffectiveMode(uri.Uri) == TlsMode.Implicit
-            && _socketConnection.InnerSocket is INatsTlsUpgradeableSocketConnection tlsUpgradeableSocketConnection)
+        // The socket only becomes the connection's once the attempt has succeeded. If the
+        // implicit TLS handshake fails, it must be closed here: carrying on with it would
+        // talk plaintext to a server whose certificate was just rejected.
+        try
         {
-            _logger.LogDebug(NatsLogEvents.Security, "Perform implicit TLS Upgrade to {Uri}", uri);
-            var sslConnection = new SslStreamConnection(tlsUpgradeableSocketConnection, Opts.TlsOpts);
-            await sslConnection.AuthenticateAsClientAsync(uri, Opts.ConnectTimeout).ConfigureAwait(false);
-            _socketConnection = _socketConnection with { InnerSocket = sslConnection };
+            // wss: ClientWebSocket did the TLS handshake
+            var tls = connectionFactory is WebSocketFactory && uri.Uri.Scheme == "wss";
+
+            if (tlsMode == TlsMode.Implicit
+                && socketConnection is INatsTlsUpgradeableSocketConnection tlsUpgradeableSocketConnection and not INatsTlsSocketConnection)
+            {
+                _logger.LogDebug(NatsLogEvents.Security, "Perform implicit TLS Upgrade to {Uri}", uri);
+                var sslConnection = new SslStreamConnection(tlsUpgradeableSocketConnection, Opts.TlsOpts);
+                socketConnection = sslConnection;
+
+                // the connection doesn't own this socket yet: close it here when disposed
+                var socket = tlsUpgradeableSocketConnection.Socket;
+                using (_disposedCts.Token.Register(() => socket.Dispose()))
+                {
+                    await sslConnection.AuthenticateAsClientAsync(uri, Opts.ConnectTimeout).ConfigureAwait(false);
+                }
+
+                tls = true;
+            }
+
+            if (OnSocketAvailableAsync != null)
+            {
+                _logger.LogInformation(NatsLogEvents.Connection, "Invoke OnSocketAvailable after connecting to NATS {Uri}", uri);
+                var replacement = await OnSocketAvailableAsync(socketConnection).ConfigureAwait(false);
+
+                // a different socket is not the one the TLS handshake was done on
+                if (!ReferenceEquals(replacement, socketConnection))
+                    tls = false;
+                socketConnection = replacement;
+            }
+
+            // A transport the client can't upgrade (a custom factory, a wrapper from the hook)
+            // would otherwise carry the connection, credentials included, in plaintext.
+            if ((tlsRequired || NatsTlsOpts.IsTlsScheme(uri.Uri))
+                && !tls
+                && socketConnection is not INatsTlsSocketConnection
+                && !(tlsMode == TlsMode.Require && socketConnection is INatsTlsUpgradeableSocketConnection))
+            {
+                throw new NatsException($"TLS is required for {uri} ({TlsRequiredReason(uri.Uri)}), but the socket connection ({socketConnection.GetType().Name}) can't be upgraded to TLS. "
+                                        + "A socket connection from SocketConnectionFactory or OnSocketAvailableAsync must implement INatsTlsUpgradeableSocketConnection, "
+                                        + "or INatsTlsSocketConnection if it provides TLS itself.");
+            }
+
+            _currentConnectionTls = tls || socketConnection is INatsTlsSocketConnection;
+        }
+        catch
+        {
+            await DisposeSocketComponentAsync(socketConnection, "socket of failed connection attempt").ConfigureAwait(false);
+            throw;
         }
 
-        if (OnSocketAvailableAsync != null)
-        {
-            _logger.LogInformation(NatsLogEvents.Connection, "Invoke OnSocketAvailable after connecting to NATS {Uri}", uri);
-            _socketConnection = _socketConnection with { InnerSocket = await OnSocketAvailableAsync(_socketConnection.InnerSocket).ConfigureAwait(false) };
-        }
+        _socketConnection = new SocketConnectionWrapper(socketConnection);
     }
 
     private async ValueTask SetupReaderWriterAsync(bool reconnect)
@@ -654,6 +728,8 @@ public partial class NatsConnection : INatsConnection
 
         if (_currentConnectUri!.IsSeed)
             _lastSeedConnectUri = _currentConnectUri;
+
+        var tlsUpgraded = false;
 
         // create the socket reader
         var waitForInfoSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -668,26 +744,31 @@ public partial class NatsConnection : INatsConnection
             await waitForInfoSignal.Task.WaitAsync(Opts.ConnectTimeout).ConfigureAwait(false);
 
             // check to see if we should upgrade to TLS
-            if (_socketConnection!.InnerSocket is INatsTlsUpgradeableSocketConnection tlsUpgradeableSocket)
+            if (_socketConnection!.InnerSocket is INatsTlsUpgradeableSocketConnection tlsUpgradeableSocket and not INatsTlsSocketConnection)
             {
-                if (Opts.TlsOpts.EffectiveMode(_currentConnectUri.Uri) == TlsMode.Disable && WritableServerInfo!.TlsRequired)
+                var tlsMode = EffectiveTlsMode(_currentConnectUri.Uri);
+                if (tlsMode == TlsMode.Disable && WritableServerInfo!.TlsRequired)
                 {
                     throw new NatsException(
                         $"Server {_currentConnectUri} requires TLS but TlsMode is set to Disable");
                 }
 
-                if (Opts.TlsOpts.EffectiveMode(_currentConnectUri.Uri) == TlsMode.Require && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
+                if (tlsMode == TlsMode.Require && !WritableServerInfo!.TlsRequired && !WritableServerInfo.TlsAvailable)
                 {
                     throw new NatsException(
-                        $"Server {_currentConnectUri} does not support TLS but TlsMode is set to Require");
+                        $"Server {_currentConnectUri} does not support TLS but TLS is required ({TlsRequiredReason(_currentConnectUri.Uri)})");
                 }
 
-                if (Opts.TlsOpts.TryTls(_currentConnectUri.Uri) && (WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable))
+                if (tlsMode is TlsMode.Require or TlsMode.Prefer && (WritableServerInfo!.TlsRequired || WritableServerInfo.TlsAvailable))
                 {
                     // do TLS upgrade
                     var targetUri = FixTlsHost(_currentConnectUri);
 
                     _logger.LogDebug(NatsLogEvents.Security, "Perform TLS Upgrade to {Uri}", targetUri);
+
+                    // This INFO came in plaintext: anyone on the path could have rewritten it.
+                    // Its connect_urls are not used.
+                    tlsUpgraded = true;
 
                     // cancel INFO parsed signal and dispose current socket reader
                     infoParsedSignal.SetCanceled();
@@ -698,6 +779,7 @@ public partial class NatsConnection : INatsConnection
                     var sslConnection = new SslStreamConnection(tlsUpgradeableSocket, Opts.TlsOpts);
                     await sslConnection.AuthenticateAsClientAsync(targetUri, Opts.ConnectTimeout).ConfigureAwait(false);
                     _socketConnection = _socketConnection with { InnerSocket = sslConnection };
+                    _currentConnectionTls = true;
 
                     // create new socket reader
                     waitForPongOrErrorSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -705,6 +787,10 @@ public partial class NatsConnection : INatsConnection
                     _socketReader = new NatsReadProtocolProcessor(_socketConnection, this, waitForInfoSignal, waitForPongOrErrorSignal, infoParsedSignal.Task);
                 }
             }
+
+            // No TLS upgrade: this first INFO came over the connection's final transport.
+            if (!tlsUpgraded)
+                SetDiscoveredServers(WritableServerInfo!.ClientConnectUrls);
 
             // mark INFO as parsed
             infoParsedSignal.SetResult();
@@ -843,21 +929,18 @@ public partial class NatsConnection : INatsConnection
             // Cleanup current socket
             await DisposeSocketAsync(true).ConfigureAwait(false);
 
-            var defaultScheme = _currentConnectUri!.Uri.Scheme;
-            var serverReportedUrls = ServerInfo?
-                                         .ClientConnectUrls?
-                                         .Select(x => new NatsUri(x, false, defaultScheme))
-                                     ?? Array.Empty<NatsUri>();
-
-            // Always keep the original seed URLs in the list of URLs to connect to
-            var urls = serverReportedUrls.Concat(Opts.GetSeedUris()).Distinct();
+            // Always keep the original seed URLs in the list of URLs to connect to. A discovered
+            // server that is also a configured one is dialled as configured.
+            var seedUrls = Opts.GetSeedUris();
+            var serverReportedUrls = GetServerReportedUris().Where(x => !seedUrls.Any(seed => seed.Host == x.Host && seed.Port == x.Port));
+            var urls = serverReportedUrls.Concat(seedUrls).Distinct();
             if (!Opts.NoRandomize)
             {
                 urls = urls.OrderBy(_ => Guid.NewGuid());
             }
 
             // Ensure the current URL is last in the list
-            urls = urls.Where(x => x != _currentConnectUri).Append(_currentConnectUri).ToArray();
+            urls = urls.Where(x => x != _currentConnectUri).Append(_currentConnectUri!).ToArray();
 
             _currentConnectUri = null;
             var urlEnumerator = urls.AsEnumerable().GetEnumerator();
@@ -1048,6 +1131,103 @@ public partial class NatsConnection : INatsConnection
             if (!_disposedCts.IsCancellationRequested)
                 _publishEventsTask = Task.Run(PublishEventsAsync, _disposedCts.Token);
         }
+    }
+
+    // A tls:// or wss:// URL among the configured servers asks for TLS for every server.
+    private TlsMode EffectiveTlsMode(Uri uri)
+        => Opts.TlsOpts.EffectiveMode(uri, _tlsUrlConfigured ??= Opts.GetSeedUris(suppressRandomization: true).Any(x => NatsTlsOpts.IsTlsScheme(x.Uri)));
+
+    // Why TLS is required for a URL, for error messages: Require is often derived, not set.
+    private string TlsRequiredReason(Uri uri)
+    {
+        var mode = Opts.TlsOpts.Mode;
+        if (mode is TlsMode.Require or TlsMode.Implicit)
+            return $"TlsMode is set to {mode}";
+        if (NatsTlsOpts.IsTlsScheme(uri))
+            return $"the URL is {uri.Scheme}://";
+        if (Opts.TlsOpts.HasTlsCerts)
+            return "TLS certificates are configured";
+        return "a tls:// or wss:// URL is among the configured servers";
+    }
+
+    private void SetDiscoveredServers(string[]? connectUrls)
+    {
+        // an INFO without connect_urls, or with an empty list, does not change the servers
+        if (connectUrls is not { Length: > 0 })
+            return;
+
+        // Servers from INFO are dialled with the transport and the TLS of the connection they
+        // were learned on: a server must not be able to choose the transport or turn TLS off.
+        var webSocket = _currentConnectUri?.IsWebSocket == true;
+        var scheme = _currentConnectionTls ? (webSocket ? "wss" : "tls") : (webSocket ? "ws" : NatsUri.DefaultScheme);
+
+        lock (_connectUrlsGate)
+        {
+            var previous = _discoveredServers;
+            var servers = new (string Entry, string Scheme)[connectUrls.Length];
+            for (var i = 0; i < connectUrls.Length; i++)
+            {
+                // A server learned over TLS keeps the scheme it was learned with when it is
+                // reported again without TLS. Each entry is read with the scheme of the
+                // connection it came from, which decides its port when it has none.
+                var entry = connectUrls[i];
+                var key = ServerKey(entry, scheme);
+                var learned = previous == null ? default : Array.Find(previous, x => x.Scheme is "tls" or "wss" && ServerKey(x.Entry, x.Scheme) == key);
+                servers[i] = (entry, learned.Scheme ?? scheme);
+            }
+
+            _discoveredServers = servers;
+        }
+    }
+
+    // Host and port as they would be dialled, so that another spelling of an entry (case,
+    // leading zeros in the port) is the same server.
+    private string ServerKey(string entry, string scheme)
+    {
+        if (string.IsNullOrWhiteSpace(entry))
+            return string.Empty;
+
+        try
+        {
+            var uri = NatsUri.FromConnectUrl(entry, scheme);
+            return $"{uri.Host}:{uri.Port}";
+        }
+        catch (Exception e) when (e is FormatException or ArgumentException)
+        {
+            return entry;
+        }
+    }
+
+    private List<NatsUri> GetServerReportedUris()
+    {
+        var uris = new List<NatsUri>();
+        (string Entry, string Scheme)[]? servers;
+        lock (_connectUrlsGate)
+            servers = _discoveredServers;
+        if (servers == null)
+            return uris;
+
+        foreach (var (connectUrl, scheme) in servers)
+        {
+            // One bad entry must not cost the others, or stop the reconnect loop.
+            if (string.IsNullOrWhiteSpace(connectUrl))
+            {
+                _logger.LogWarning(NatsLogEvents.Connection, "Ignoring empty server URL in INFO connect_urls");
+                continue;
+            }
+
+            try
+            {
+                uris.Add(NatsUri.FromConnectUrl(connectUrl, scheme));
+            }
+            catch (Exception e) when (e is FormatException or ArgumentException)
+            {
+                // the entry is server input: escape it so it can't forge log lines
+                _logger.LogWarning(NatsLogEvents.Connection, e, "Ignoring invalid server URL in INFO connect_urls: {Url}", JsonEncodedText.Encode(connectUrl).ToString());
+            }
+        }
+
+        return uris;
     }
 
     private NatsUri FixTlsHost(NatsUri uri)
@@ -1274,6 +1454,8 @@ public partial class NatsConnection : INatsConnection
 
         if (_socketReader != null)
         {
+            _socketReader.Detach();
+
             if (asyncReaderDispose)
             {
                 // reader is not share state, can dispose asynchronously.
