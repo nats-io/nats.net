@@ -367,18 +367,24 @@ public class NatsSvcServer : INatsSvcServer
         // only wait out its timeout, so the endpoints are disposed straight away.
         // That still handles what they have already received.
         var fence = _nats.ConnectionState == NatsConnectionState.Open;
-        await Task.WhenAll(_endPoints.Values.Select(ep => StopEndpointAsync(ep, fence, cancellationToken))).ConfigureAwait(false);
-
-        _channel.Writer.TryComplete();
-
-        _cts.Cancel();
         try
         {
-            await _taskMsgLoop;
+            await Task.WhenAll(_endPoints.Values.Select(ep => StopEndpointAsync(ep, fence, cancellationToken))).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        finally
         {
-            // intentionally canceled
+            // An endpoint that fails to stop must not leave the service half stopped.
+            _channel.Writer.TryComplete();
+
+            _cts.Cancel();
+            try
+            {
+                await _taskMsgLoop.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // intentionally canceled
+            }
         }
     }
 

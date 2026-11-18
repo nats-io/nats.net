@@ -435,7 +435,10 @@ public class ServicesTests
         var cancellationToken = cts.Token;
 
         await using var server = await NatsServerProcess.StartAsync();
-        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+
+        // The first requests are held in their handlers for the whole test, so they need
+        // longer than the default request timeout.
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(30) });
         await nats.ConnectRetryAsync();
         var svc = new NatsSvcContext(nats);
 
@@ -461,14 +464,16 @@ public class ServicesTests
         // Every endpoint has a request in its handler, so whichever one is stopped first
         // keeps the stop waiting.
         var replies = names.Select(n => nats.RequestAsync<int, int>(n, 1, cancellationToken: cancellationToken).AsTask()).ToArray();
-        await Task.WhenAll(started.Values.Select(t => t.Task));
-
-        var stopTask = s1.StopAsync(cancellationToken).AsTask();
+        Task stopTask;
 
         // While the stop is waiting on the handlers, none of the endpoints may still be
         // subscribed. An endpoint that is would take the request and leave it unanswered.
         try
         {
+            await Task.WhenAll(started.Values.Select(t => t.Task)).WaitAsync(cancellationToken);
+
+            stopTask = s1.StopAsync(cancellationToken).AsTask();
+
             foreach (var name in names)
             {
                 await Retry.Until(
@@ -516,7 +521,7 @@ public class ServicesTests
     [Fact]
     public async Task Stop_service_dispose_does_not_add_up_fence_timeouts_when_connection_is_closed()
     {
-        var drainPingTimeout = TimeSpan.FromSeconds(3);
+        var drainPingTimeout = TimeSpan.FromSeconds(5);
         const int endpointCount = 5;
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -538,16 +543,17 @@ public class ServicesTests
         }
 
         await server.StopAsync();
+        await Retry.Until("connection is not open", () => nats.ConnectionState != NatsConnectionState.Open);
 
         var stopwatch = Stopwatch.StartNew();
         await s1.DisposeAsync();
         stopwatch.Stop();
         _output.WriteLine($"[T] dispose took {stopwatch.Elapsed}");
 
-        // One endpoint after another, each waiting out its fence, takes
-        // endpointCount * drainPingTimeout. Two timeouts is well below that and leaves
-        // room for a slow machine.
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromTicks(drainPingTimeout.Ticks * 2), $"dispose took {stopwatch.Elapsed}");
+        // With the connection down no endpoint should wait for a fence at all. One
+        // endpoint after another, each waiting out its fence, takes
+        // endpointCount * drainPingTimeout, and all of them waiting together takes one.
+        Assert.True(stopwatch.Elapsed < drainPingTimeout, $"dispose took {stopwatch.Elapsed}");
     }
 
     [Fact]
@@ -1142,7 +1148,7 @@ public class ServicesTests
         using var createCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         var stopwatch = Stopwatch.StartNew();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-            await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: createCts.Token));
+            await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: createCts.Token).AsTask().WaitAsync(cancellationToken));
         stopwatch.Stop();
 
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(15), $"AddServiceAsync took {stopwatch.Elapsed}");
