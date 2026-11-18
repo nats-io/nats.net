@@ -358,17 +358,16 @@ public class NatsSvcServer : INatsSvcServer
         // that are already in flight are not dropped.
         // This MUST happen before _cts.Cancel() below, otherwise the endpoint
         // handler loop is cancelled before it can drain its channel.
-        foreach (var ep in _endPoints.Values)
-        {
-            try
-            {
-                await ep.DrainAsync(cancellationToken).ConfigureAwait(false);
-            }
-            finally
-            {
-                await ep.DisposeAsync().ConfigureAwait(false);
-            }
-        }
+        //
+        // The endpoints are stopped together. One at a time, an endpoint stays
+        // subscribed and keeps taking new requests for as long as the ones before
+        // it are busy, and the fence timeouts add up when the server does not answer.
+        //
+        // Without an open connection there is nothing to fence and the PING would
+        // only wait out its timeout, so the endpoints are disposed straight away.
+        // That still handles what they have already received.
+        var fence = _nats.ConnectionState == NatsConnectionState.Open;
+        await Task.WhenAll(_endPoints.Values.Select(ep => StopEndpointAsync(ep, fence, cancellationToken))).ConfigureAwait(false);
 
         _channel.Writer.TryComplete();
 
@@ -380,6 +379,19 @@ public class NatsSvcServer : INatsSvcServer
         catch (OperationCanceledException)
         {
             // intentionally canceled
+        }
+    }
+
+    private async Task StopEndpointAsync(NatsSvcEndpointBase ep, bool fence, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (fence)
+                await ep.DrainAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            await ep.DisposeAsync().ConfigureAwait(false);
         }
     }
 

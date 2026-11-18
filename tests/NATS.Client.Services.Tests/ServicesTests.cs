@@ -429,6 +429,128 @@ public class ServicesTests
     }
 
     [Fact]
+    public async Task Stop_service_unsubscribes_all_end_points_while_handlers_are_busy()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        var names = new[] { "e1", "e2", "e3" };
+        var started = names.ToDictionary(n => n, _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+        var releaseHandlers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        foreach (var name in names)
+        {
+            await s1.AddEndpointAsync<int>(
+                name: name,
+                handler: async m =>
+                {
+                    started[name].TrySetResult();
+                    await releaseHandlers.Task;
+                    await m.ReplyAsync(m.Data, cancellationToken: cancellationToken);
+                },
+                cancellationToken: cancellationToken);
+        }
+
+        // Every endpoint has a request in its handler, so whichever one is stopped first
+        // keeps the stop waiting.
+        var replies = names.Select(n => nats.RequestAsync<int, int>(n, 1, cancellationToken: cancellationToken).AsTask()).ToArray();
+        await Task.WhenAll(started.Values.Select(t => t.Task));
+
+        var stopTask = s1.StopAsync(cancellationToken).AsTask();
+
+        // While the stop is waiting on the handlers, none of the endpoints may still be
+        // subscribed. An endpoint that is would take the request and leave it unanswered.
+        try
+        {
+            foreach (var name in names)
+            {
+                await Retry.Until(
+                    $"endpoint {name} is unsubscribed",
+                    async () =>
+                    {
+                        using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                        probeCts.CancelAfter(TimeSpan.FromSeconds(1));
+                        try
+                        {
+                            await nats.RequestAsync<int, int>(name, 2, cancellationToken: probeCts.Token);
+                        }
+                        catch (NatsNoRespondersException)
+                        {
+                            return true;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                        }
+                        catch (NatsNoReplyException)
+                        {
+                        }
+
+                        return false;
+                    },
+                    timeout: TimeSpan.FromSeconds(10));
+            }
+
+            Assert.False(stopTask.IsCompleted);
+        }
+        finally
+        {
+            // Let the handlers go on a failure too, or the stop never finishes.
+            releaseHandlers.TrySetResult();
+        }
+
+        await stopTask;
+
+        foreach (var reply in replies)
+        {
+            Assert.Equal(1, (await reply).Data);
+        }
+    }
+
+    [Fact]
+    public async Task Stop_service_dispose_does_not_add_up_fence_timeouts_when_connection_is_closed()
+    {
+        var drainPingTimeout = TimeSpan.FromSeconds(3);
+        const int endpointCount = 5;
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, DrainPingTimeout = drainPingTimeout });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        for (var i = 0; i < endpointCount; i++)
+        {
+            await s1.AddEndpointAsync<int>(
+                name: $"e{i}",
+                handler: async m => await m.ReplyAsync(m.Data, cancellationToken: cancellationToken),
+                cancellationToken: cancellationToken);
+        }
+
+        await server.StopAsync();
+
+        var stopwatch = Stopwatch.StartNew();
+        await s1.DisposeAsync();
+        stopwatch.Stop();
+        _output.WriteLine($"[T] dispose took {stopwatch.Elapsed}");
+
+        // One endpoint after another, each waiting out its fence, takes
+        // endpointCount * drainPingTimeout. Two timeouts is well below that and leaves
+        // room for a slow machine.
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromTicks(drainPingTimeout.Ticks * 2), $"dispose took {stopwatch.Elapsed}");
+    }
+
+    [Fact]
     public async Task Remove_end_point_that_does_not_exist()
     {
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
