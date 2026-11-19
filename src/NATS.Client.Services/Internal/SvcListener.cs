@@ -15,6 +15,7 @@ internal class SvcListener : IAsyncDisposable
     private readonly CancellationTokenSource _cts;
     private INatsSub<NatsMemoryOwner<byte>>? _sub;
     private Task? _readLoop;
+    private Task? _startTask;
 
     public SvcListener(ILogger logger, INatsConnection nats, Channel<SvcMsg> channel, SvcMsgType type, string subject, string? queueGroup, CancellationToken cancellationToken)
     {
@@ -27,7 +28,59 @@ internal class SvcListener : IAsyncDisposable
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
     }
 
-    public async ValueTask StartAsync()
+    public ValueTask StartAsync()
+    {
+        _startTask = StartCoreAsync();
+        return new ValueTask(_startTask);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _cts.Cancel();
+
+        // A caller may have stopped waiting for the start while the subscribe was still
+        // in flight. Let it settle first, or a subscribe that completes after the checks
+        // below is never unsubscribed.
+        if (_startTask != null)
+        {
+            try
+            {
+                await _startTask.ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // The caller of StartAsync has this failure. Nothing was subscribed.
+            }
+        }
+
+        if (_sub != null)
+        {
+            try
+            {
+                await _sub.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        if (_readLoop != null)
+        {
+            try
+            {
+                await _readLoop.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // intentionally canceled
+            }
+        }
+    }
+
+    private async Task StartCoreAsync()
     {
         _sub = await _nats.SubscribeCoreAsync(_subject, _queueGroup, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default, cancellationToken: _cts.Token).ConfigureAwait(false);
         _readLoop = Task.Run(async () =>
@@ -57,36 +110,5 @@ internal class SvcListener : IAsyncDisposable
                 _logger.LogError(NatsSvcLogEvents.Listener, e, "Error in {Subject} subscription", _subject);
             }
         });
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        _cts.Cancel();
-
-        if (_sub != null)
-        {
-            try
-            {
-                await _sub.DisposeAsync().ConfigureAwait(false);
-            }
-            catch (ObjectDisposedException)
-            {
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }
-
-        if (_readLoop != null)
-        {
-            try
-            {
-                await _readLoop.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // intentionally canceled
-            }
-        }
     }
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using NATS.Client.Core.Tests;
@@ -425,6 +426,134 @@ public class ServicesTests
         await s1.DisposeAsync();
 
         Assert.Equal(0, Volatile.Read(ref handled));
+    }
+
+    [Fact]
+    public async Task Stop_service_unsubscribes_all_end_points_while_handlers_are_busy()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+
+        // The first requests are held in their handlers for the whole test, so they need
+        // longer than the default request timeout.
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, RequestTimeout = TimeSpan.FromSeconds(30) });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        var names = new[] { "e1", "e2", "e3" };
+        var started = names.ToDictionary(n => n, _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+        var releaseHandlers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        foreach (var name in names)
+        {
+            await s1.AddEndpointAsync<int>(
+                name: name,
+                handler: async m =>
+                {
+                    started[name].TrySetResult();
+                    await releaseHandlers.Task;
+                    await m.ReplyAsync(m.Data, cancellationToken: cancellationToken);
+                },
+                cancellationToken: cancellationToken);
+        }
+
+        // Every endpoint has a request in its handler, so whichever one is stopped first
+        // keeps the stop waiting.
+        var replies = names.Select(n => nats.RequestAsync<int, int>(n, 1, cancellationToken: cancellationToken).AsTask()).ToArray();
+        Task stopTask;
+
+        // While the stop is waiting on the handlers, none of the endpoints may still be
+        // subscribed. An endpoint that is would take the request and leave it unanswered.
+        try
+        {
+            await Task.WhenAll(started.Values.Select(t => t.Task)).WaitAsync(cancellationToken);
+
+            stopTask = s1.StopAsync(cancellationToken).AsTask();
+
+            foreach (var name in names)
+            {
+                await Retry.Until(
+                    $"endpoint {name} is unsubscribed",
+                    async () =>
+                    {
+                        using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                        probeCts.CancelAfter(TimeSpan.FromSeconds(1));
+                        try
+                        {
+                            await nats.RequestAsync<int, int>(name, 2, cancellationToken: probeCts.Token);
+                        }
+                        catch (NatsNoRespondersException)
+                        {
+                            return true;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                        }
+                        catch (NatsNoReplyException)
+                        {
+                        }
+
+                        return false;
+                    },
+                    timeout: TimeSpan.FromSeconds(10));
+            }
+
+            Assert.False(stopTask.IsCompleted);
+        }
+        finally
+        {
+            // Let the handlers go on a failure too, or the stop never finishes.
+            releaseHandlers.TrySetResult();
+        }
+
+        await stopTask;
+
+        foreach (var reply in replies)
+        {
+            Assert.Equal(1, (await reply).Data);
+        }
+    }
+
+    [Fact]
+    public async Task Stop_service_dispose_does_not_add_up_fence_timeouts_when_connection_is_closed()
+    {
+        var drainPingTimeout = TimeSpan.FromSeconds(5);
+        const int endpointCount = 5;
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url, DrainPingTimeout = drainPingTimeout });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: cancellationToken);
+
+        for (var i = 0; i < endpointCount; i++)
+        {
+            await s1.AddEndpointAsync<int>(
+                name: $"e{i}",
+                handler: async m => await m.ReplyAsync(m.Data, cancellationToken: cancellationToken),
+                cancellationToken: cancellationToken);
+        }
+
+        await server.StopAsync();
+        await Retry.Until("connection is not open", () => nats.ConnectionState != NatsConnectionState.Open);
+
+        var stopwatch = Stopwatch.StartNew();
+        await s1.DisposeAsync();
+        stopwatch.Stop();
+        _output.WriteLine($"[T] dispose took {stopwatch.Elapsed}");
+
+        // With the connection down no endpoint should wait for a fence at all. One
+        // endpoint after another, each waiting out its fence, takes
+        // endpointCount * drainPingTimeout, and all of them waiting together takes one.
+        Assert.True(stopwatch.Elapsed < drainPingTimeout, $"dispose took {stopwatch.Elapsed}");
     }
 
     [Fact]
@@ -944,5 +1073,84 @@ public class ServicesTests
         });
 
         Assert.Equal("Queue group is invalid.", exception.Message);
+    }
+
+    [Fact]
+    public async Task Service_outlives_the_token_passed_to_add_service()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        using var createCts = new CancellationTokenSource();
+        await using var s1 = await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: createCts.Token);
+        await s1.AddEndpointAsync<int>(
+            name: "e1",
+            handler: async m => await m.ReplyAsync(m.Data * 2, cancellationToken: cancellationToken),
+            cancellationToken: cancellationToken);
+
+        createCts.Cancel();
+
+        // Cancelling the creation token must not touch the running service:
+        // discovery and the endpoint both still answer.
+        Assert.Equal(42, (await nats.RequestAsync<int, int>("e1", 21, cancellationToken: cancellationToken)).Data);
+        Assert.Contains("s1", (await nats.RequestAsync<string, string>("$SRV.PING.s1", "{}", cancellationToken: cancellationToken)).Data);
+
+        await s1.StopAsync(cancellationToken);
+
+        // After stop nothing answers, discovery or endpoint.
+        await Assert.ThrowsAsync<NatsNoRespondersException>(async () =>
+            await nats.RequestAsync<int, int>("e1", 0, cancellationToken: cancellationToken));
+        await Assert.ThrowsAsync<NatsNoRespondersException>(async () =>
+            await nats.RequestAsync<string, string>("$SRV.PING.s1", "{}", cancellationToken: cancellationToken));
+    }
+
+    [Fact]
+    public async Task Add_service_with_cancelled_token_throws_and_leaves_nothing_subscribed()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        using var createCts = new CancellationTokenSource();
+        createCts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: createCts.Token));
+
+        await Assert.ThrowsAsync<NatsNoRespondersException>(async () =>
+            await nats.RequestAsync<string, string>("$SRV.PING.s1", "{}", cancellationToken: cancellationToken));
+    }
+
+    [Fact]
+    public async Task Add_service_token_interrupts_creation_while_connection_is_down()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+        var svc = new NatsSvcContext(nats);
+
+        // Connection is now reconnecting, so the discovery subscribes wait for it to come back.
+        await server.StopAsync();
+        await Retry.Until("connection is not open", () => nats.ConnectionState != NatsConnectionState.Open);
+
+        using var createCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var stopwatch = Stopwatch.StartNew();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await svc.AddServiceAsync("s1", "1.0.0", cancellationToken: createCts.Token).AsTask().WaitAsync(cancellationToken));
+        stopwatch.Stop();
+
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(15), $"AddServiceAsync took {stopwatch.Elapsed}");
     }
 }
