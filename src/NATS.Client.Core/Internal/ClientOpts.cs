@@ -17,6 +17,10 @@ internal sealed class ClientOpts
         Echo = opts.Echo;
         Verbose = opts.Verbose;
         Headers = opts.Headers;
+
+        // The server rejects no_responders when headers are not enabled.
+        NoResponders = opts.Headers;
+
         Username = opts.AuthOpts.Username;
         Password = opts.AuthOpts.Password;
         AuthToken = opts.AuthOpts.Token;
