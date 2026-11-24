@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading.Channels;
+using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
@@ -713,7 +714,29 @@ public class NatsKVStore : INatsKVStore
             subOpts: default,
             cancellationToken: cancellationToken);
 
-        await watcher.InitAsync();
+        try
+        {
+            await watcher.InitAsync();
+        }
+        catch
+        {
+            // The watcher is never returned to the caller, so dispose it here. Otherwise its
+            // delivery subscription stays registered on the connection and keeps any consumer
+            // the server did create alive.
+            try
+            {
+                await watcher.DisposeAsync();
+            }
+            catch (Exception e)
+            {
+                // The caller needs the error that failed the call, not the cleanup one.
+                JetStreamContext.Connection.Opts.LoggerFactory
+                    .CreateLogger<NatsKVStore>()
+                    .LogWarning(NatsKVLogEvents.Internal, e, "Error disposing watcher after consumer creation failed");
+            }
+
+            throw;
+        }
 
         return watcher;
     }

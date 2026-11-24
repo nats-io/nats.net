@@ -149,22 +149,42 @@ internal sealed class NatsKVWatcher<T> : IAsyncDisposable
     {
         _nats.ConnectionDisconnected -= OnDisconnected;
 
-        if (_sub != null)
-        {
-            await _sub.DisposeAsync();
-        }
-
+        // Stop everything that can install a new subscription before disposing the current
+        // one: the heartbeat timer, and a recreate already queued or in flight in
+        // ConsumerCreateLoop. Otherwise a recreate overlapping dispose leaves its new
+        // subscription, and the consumer bound to it, behind.
+        //
+        // The command and entry channels are completed before waiting for the recreate,
+        // not after. A recreate registers its subscription with a write to the command
+        // channel, and in Wait mode that write blocks while the channel is full, which it
+        // is whenever the command loop is itself blocked on an entry nobody is reading.
+        // Completing the channels fails that write, the subscription is disposed by the
+        // subscribe path, and the wait below returns. Messages still arriving on the
+        // delivery subject meet the completed channel and are dropped by the subscription.
 #if NETSTANDARD2_0
         _timer.Dispose();
 #else
         await _timer.DisposeAsync().ConfigureAwait(false);
 #endif
-
         _consumerCreateChannel.Writer.TryComplete();
         _commandChannel.Writer.TryComplete();
         _entryChannel.Writer.TryComplete();
         await _consumerCreateTask;
-        await _commandTask;
+
+        try
+        {
+            if (_sub != null)
+            {
+                await _sub.DisposeAsync();
+            }
+        }
+        finally
+        {
+            // Unsubscribe can fail, for example when a stalled command writer times out.
+            // The command loop must still be waited for or the watcher keeps running after
+            // the caller has let go of it.
+            await _commandTask;
+        }
     }
 
     internal async ValueTask InitAsync()
