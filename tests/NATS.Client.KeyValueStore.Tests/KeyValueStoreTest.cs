@@ -420,24 +420,29 @@ public class KeyValueStoreTest
             return count;
         }
 
-        // k1 is deleted outside of the delete markers threshold used below, k2 within it
+        // k1 is deleted outside of the delete markers threshold used below, k2 within it. The threshold is
+        // the time since k2 was deleted plus a margin, so k2's marker stays inside it however slow the steps
+        // in between are, and k1's stays outside because the delay before k2 is longer than the margin.
+        var margin = TimeSpan.FromSeconds(1);
+
         await store.PutAsync("k1", "v1", cancellationToken: cancellationToken);
         await store.PutAsync("k1", "v2", cancellationToken: cancellationToken);
         await store.PutAsync("k1", "v3", cancellationToken: cancellationToken);
         await store.DeleteAsync("k1", cancellationToken: cancellationToken);
 
-        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        await Task.Delay(margin + TimeSpan.FromSeconds(1), cancellationToken);
 
         await store.PutAsync("k2", "v1", cancellationToken: cancellationToken);
         await store.PutAsync("k2", "v2", cancellationToken: cancellationToken);
         await store.PutAsync("k2", "v3", cancellationToken: cancellationToken);
+        var sinceK2Deleted = Stopwatch.StartNew();
         await store.DeleteAsync("k2", cancellationToken: cancellationToken);
 
         Assert.Equal(4, await HistoryCountAsync("k1"));
         Assert.Equal(4, await HistoryCountAsync("k2"));
 
         _output.WriteLine("PURGE DELETES RETAINING RECENTLY DELETED KEY HISTORY");
-        var opts = new NatsKVPurgeOpts { DeleteMarkersThreshold = TimeSpan.FromSeconds(1), RetainRecentlyDeletedKeyHistory = true };
+        var opts = new NatsKVPurgeOpts { DeleteMarkersThreshold = sinceK2Deleted.Elapsed + margin, RetainRecentlyDeletedKeyHistory = true };
         await store.PurgeDeletesAsync(opts: opts, cancellationToken: cancellationToken);
 
         // k1 was deleted before the threshold so it's gone entirely, k2 is untouched
@@ -445,7 +450,8 @@ public class KeyValueStoreTest
         Assert.Equal(4, await HistoryCountAsync("k2"));
 
         _output.WriteLine("PURGE DELETES WITHOUT RETAINING RECENTLY DELETED KEY HISTORY");
-        await store.PurgeDeletesAsync(opts: opts with { RetainRecentlyDeletedKeyHistory = false }, cancellationToken: cancellationToken);
+        opts = opts with { DeleteMarkersThreshold = sinceK2Deleted.Elapsed + margin, RetainRecentlyDeletedKeyHistory = false };
+        await store.PurgeDeletesAsync(opts: opts, cancellationToken: cancellationToken);
 
         // k2 is still within the threshold, so only its delete marker is kept
         Assert.Equal(0, await HistoryCountAsync("k1"));
