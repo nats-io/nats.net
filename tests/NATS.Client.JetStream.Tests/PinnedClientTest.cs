@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using NATS.Client.Core;
 using NATS.Client.Core.Tests;
@@ -561,7 +562,7 @@ public class PinnedClientMockServerTest
     public async Task Queued_consume_pull_request_should_use_latest_pin_id_when_sent()
     {
         var pullRequestCount = 0;
-        var secondPullRequest = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var queuedPullRequest = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         await using var ms = new MockServer((_, cmd) =>
         {
@@ -574,9 +575,11 @@ public class PinnedClientMockServerTest
             if (cmd.Name == "PUB" && cmd.Subject.Contains("CONSUMER.MSG.NEXT", StringComparison.Ordinal))
             {
                 var request = cmd.Buffer is null ? string.Empty : new string(cmd.Buffer);
-                if (Interlocked.Increment(ref pullRequestCount) == 2)
+
+                // 1: the initial pull, 2: the one the pull loop is held on, 3: the one queued meanwhile
+                if (Interlocked.Increment(ref pullRequestCount) == 3)
                 {
-                    secondPullRequest.TrySetResult(request);
+                    queuedPullRequest.TrySetResult(request);
                 }
             }
 
@@ -584,7 +587,8 @@ public class PinnedClientMockServerTest
         });
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url });
+        using var pullLoopGate = new PullLoopGate();
+        await using var nats = new NatsConnection(new NatsOpts { Url = ms.Url, LoggerFactory = pullLoopGate });
         await nats.ConnectRetryAsync();
         var js = nats.CreateJetStreamContext();
         var consumer = (NatsJSConsumer)await js.GetConsumerAsync("x", "x", cts.Token);
@@ -595,12 +599,63 @@ public class PinnedClientMockServerTest
             opts: new NatsJSConsumeOpts { MaxMsgs = 1, ThresholdMsgs = 0 },
             cancellationToken: cts.Token);
 
+        // The pull loop takes this pull request and is held while it sends it, so the next one stays queued.
+        cc.Delivered(1);
+        pullLoopGate.Held.Wait(cts.Token);
+
         cc.Delivered(1);
         consumer.SetPinId("pin-new");
+        pullLoopGate.Release.Set();
 
-        await secondPullRequest.Task.WaitAsync(cts.Token);
-        var request = await secondPullRequest.Task;
+        await queuedPullRequest.Task.WaitAsync(cts.Token);
+        var request = await queuedPullRequest.Task;
         Assert.Contains(@"""id"":""pin-new""", request);
         Assert.DoesNotContain(@"""id"":""pin-old""", request);
+    }
+
+    /// <summary>
+    /// Holds the consume pull loop the first time it logs that it is sending a pull request, until
+    /// <see cref="Release"/> is set. The pull loop has read the pin id for that request by then, and does not
+    /// take the next request from its queue until it is released.
+    /// </summary>
+    private sealed class PullLoopGate : ILoggerFactory, ILogger, IDisposable
+    {
+        private int _held;
+
+        public ManualResetEventSlim Held { get; } = new();
+
+        public ManualResetEventSlim Release { get; } = new();
+
+        public ILogger CreateLogger(string categoryName) => this;
+
+        public void AddProvider(ILoggerProvider provider)
+        {
+        }
+
+        IDisposable ILogger.BeginScope<TState>(TState state) => NoScope.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (formatter(state, exception).StartsWith("Sending pull request for pull-loop(", StringComparison.Ordinal)
+                && Interlocked.Exchange(ref _held, 1) == 0)
+            {
+                Held.Set();
+                Release.Wait(TimeSpan.FromSeconds(30));
+            }
+        }
+
+        // Only releases the pull loop: it may still be inside Release.Wait, so the events are not disposed.
+        public void Dispose() => Release.Set();
+
+        private sealed class NoScope : IDisposable
+        {
+            public static readonly NoScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
     }
 }
