@@ -1077,6 +1077,105 @@ public class KeyValueStoreTest
         Assert.ThrowsAny<InvalidOperationException>(() => finalValue.Error);
     }
 
+    [Fact]
+    public async Task Try_Create_propagates_errors_unrelated_to_revision()
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync(new NatsKVConfig("b1") { MaxValueSize = 100 });
+
+        // The server rejects the write for its size, which says nothing about
+        // whether the key exists, so the error must come back as it is.
+        var result = await store.TryCreateAsync("k1", new string('x', 1024));
+        Assert.False(result.Success);
+        var error = Assert.IsType<NatsJSApiException>(result.Error);
+        Assert.Equal(10054, error.Error.ErrCode);
+    }
+
+    [Fact]
+    public async Task Try_Create_over_deleted_key_reports_create_error_to_losers()
+    {
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+
+        var js = new NatsJSContext(nats);
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync("b1");
+
+        await store.PutAsync("k1", "v1");
+        await store.DeleteAsync("k1");
+
+        // Every caller sees the tombstone and tries to write over it. One wins,
+        // and the rest lose on the revision check of the second write.
+        var tasks = new List<Task<NatsResult<ulong>>>();
+        for (var i = 0; i < 32; i++)
+        {
+            tasks.Add(store.TryCreateAsync("k1", $"v{i}").AsTask());
+        }
+
+        var results = await Task.WhenAll(tasks);
+
+        Assert.Single(results, r => r.Success);
+        Assert.All(results.Where(r => !r.Success), r => Assert.IsType<NatsKVCreateException>(r.Error));
+    }
+
+    [Fact]
+    public async Task Try_Create_reports_create_error_when_read_misses_existing_key()
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        await using var server = await NatsServerProcess.StartAsync();
+        await using var nats = new NatsConnection(new NatsOpts { Url = server.Url });
+        await nats.ConnectRetryAsync();
+
+        // Stand in for a replica that has not caught up: JetStream API requests
+        // go through a prefix that forwards them unchanged, except direct gets,
+        // which are pointed at a key that does not exist so the server answers 404.
+        const string prefix = "stale";
+        await using var sub = await nats.SubscribeCoreAsync<byte[]>($"{prefix}.>", cancellationToken: cancellationToken);
+        var forwarder = Task.Run(
+            async () =>
+            {
+                await foreach (var msg in sub.Msgs.ReadAllAsync(cancellationToken))
+                {
+                    var subject = "$JS.API" + msg.Subject.Substring(prefix.Length);
+                    var data = msg.Data ?? Array.Empty<byte>();
+                    if (subject.StartsWith("$JS.API.DIRECT.GET.", StringComparison.Ordinal))
+                    {
+                        data = "{\"last_by_subj\":\"$KV.b1.never-written\"}"u8.ToArray();
+                    }
+
+                    await nats.PublishAsync(subject, data, replyTo: msg.ReplyTo, cancellationToken: cancellationToken);
+                }
+            },
+            cancellationToken);
+
+        var js = new NatsJSContext(nats, new NatsJSOpts(nats.Opts, apiPrefix: prefix));
+        var kv = new NatsKVContext(js);
+
+        var store = await kv.CreateStoreAsync("b1", cancellationToken);
+
+        await store.PutAsync("k1", "v1", cancellationToken: cancellationToken);
+
+        var read = await store.TryGetEntryAsync<string>("k1", cancellationToken: cancellationToken);
+        Assert.IsType<NatsKVKeyNotFoundException>(read.Error);
+
+        var result = await store.TryCreateAsync("k1", "v2", cancellationToken: cancellationToken);
+        Assert.False(result.Success);
+        Assert.IsType<NatsKVCreateException>(result.Error);
+
+        await sub.UnsubscribeAsync();
+        await forwarder;
+    }
+
     [Theory]
     [InlineData(NatsRequestReplyMode.Direct)]
     [InlineData(NatsRequestReplyMode.SharedInbox)]
