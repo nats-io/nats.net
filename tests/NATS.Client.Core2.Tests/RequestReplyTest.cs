@@ -152,6 +152,55 @@ public class RequestReplyTest
             await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0, replyOpts: new NatsSubOpts { ThrowIfNoResponders = true }));
     }
 
+    [Theory]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    public async Task Request_reply_with_headers_disabled_test(NatsRequestReplyMode mode)
+    {
+        // The server closes a connection that asks for no_responders without headers,
+        // so connecting at all is the first thing to check.
+        await using var nats = new NatsConnection(new NatsOpts { Url = _server.Url, Headers = false, RequestReplyMode = mode });
+        await nats.ConnectAsync();
+        Assert.Equal(NatsConnectionState.Open, nats.ConnectionState);
+
+        var subject = Guid.NewGuid().ToString();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+
+        var sub = await nats.SubscribeCoreAsync<int>(subject, cancellationToken: cancellationToken);
+        var reg = sub.Register(async msg =>
+        {
+            await msg.ReplyAsync(msg.Data * 2, cancellationToken: cancellationToken);
+        });
+        await nats.PingAsync(cancellationToken);
+
+        var rep = await nats.RequestAsync<int, int>(subject, 21, cancellationToken: cancellationToken);
+        Assert.Equal(42, rep.Data);
+
+        await sub.DisposeAsync();
+        await reg;
+    }
+
+    [Theory]
+    [InlineData(NatsRequestReplyMode.SharedInbox)]
+    [InlineData(NatsRequestReplyMode.Direct)]
+    public async Task Request_reply_no_responders_with_headers_disabled_times_out_test(NatsRequestReplyMode mode)
+    {
+        // Without headers the server cannot send the 503 sentinel, so a request
+        // nobody answers runs to its timeout instead of failing straight away.
+        await using var nats = new NatsConnection(new NatsOpts
+        {
+            Url = _server.Url,
+            Headers = false,
+            RequestReplyMode = mode,
+            RequestTimeout = TimeSpan.FromSeconds(1),
+        });
+        await nats.ConnectAsync();
+
+        await Assert.ThrowsAsync<NatsNoReplyException>(async () =>
+            await nats.RequestAsync<int, int>(Guid.NewGuid().ToString(), 0, replyOpts: new NatsSubOpts { ThrowIfNoResponders = true }));
+    }
+
     [Fact]
     public async Task Request_reply_many_test()
     {
