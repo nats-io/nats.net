@@ -38,6 +38,8 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
 #endif
     private long _pendingMsgs;
     private long _pendingBytes;
+    private bool _consumerHasReplied;
+    private int _quickRepulls;
 
     public NatsJSOrderedConsume(
         long maxMsgs,
@@ -236,6 +238,9 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
                         }
                     }
 
+                    if (headers.Code != 503)
+                        _consumerHasReplied = true;
+
                     if (headers is { Code: 408, Message: NatsHeaders.Messages.RequestTimeout })
                     {
                     }
@@ -253,6 +258,15 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
                             _pendingBytes = 0;
                             _pendingMsgs = 0;
                         }
+                    }
+                    else if (headers.Code == 503 && !_consumerHasReplied && NatsJSOptsDefaults.TryGetNoRespondersQuickRepullDelay(++_quickRepulls, _idle, out var delay))
+                    {
+                        // A pull to a just-created consumer can race the propagation of its interest across the cluster.
+                        // Until the consumer has replied, the pull that got this is the only one (pending is at its max),
+                        // so pull again shortly rather than wait for the heartbeat timeout, which can't fire first since
+                        // the delay is within it; after that, a 503 is left to the timeout as before.
+                        _logger.LogDebug(NatsJSLogEvents.NoResponders, "503 no responders before the consumer replied; pulling again in {Delay}", delay);
+                        RepullAfter(delay);
                     }
                     else if (headers.HasTerminalJSError())
                     {
@@ -280,6 +294,8 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         }
         else
         {
+            _consumerHasReplied = true;
+
             var msg = new NatsJSMsg<TMsg>(
                 NatsMsg<TMsg>.BuildInternal(
                     subject,
@@ -398,6 +414,20 @@ internal class NatsJSOrderedConsume<TMsg> : NatsSubBase
         },
         Origin = origin,
     });
+
+    // Not on the heartbeat timer, since that's reset from outside just after the first pull (in OrderedConsumeInternalAsync),
+    // which a 503 can beat. Once disposed, the pull request channel is complete, so a late re-pull is dropped.
+    private void RepullAfter(TimeSpan delay) => Task.Delay(delay, _cancellationToken).ContinueWith(
+        static (delayTask, state) =>
+        {
+            var self = (NatsJSOrderedConsume<TMsg>)state!;
+            if (!delayTask.IsCanceled && self.Connection.ConnectionState == NatsConnectionState.Open)
+                self.Pull("503-quick-repull", self._maxMsgs, self._maxBytes);
+        },
+        this,
+        CancellationToken.None,
+        TaskContinuationOptions.ExecuteSynchronously,
+        TaskScheduler.Default);
 
     private async Task PullLoop()
     {
