@@ -135,6 +135,15 @@ public sealed record NatsOpts
 
     public TimeSpan CommandTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// Maximum time a single socket write may take before the connection is considered dead
+    /// and aborted, which triggers a reconnect. Detects a stalled write path (e.g. a peer that
+    /// stopped reading without closing the connection) faster than <see cref="PingInterval"/>
+    /// and <see cref="MaxPingOut"/>. Set to <see cref="TimeSpan.Zero"/> or
+    /// <see cref="Timeout.InfiniteTimeSpan"/> to disable. (default: 1 minute)
+    /// </summary>
+    public TimeSpan SocketWriteTimeout { get; init; } = TimeSpan.FromMinutes(1);
+
     public TimeSpan SubscriptionCleanUpInterval { get; init; } = TimeSpan.FromMinutes(5);
 
     /// <summary>

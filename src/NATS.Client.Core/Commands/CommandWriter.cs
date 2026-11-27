@@ -45,6 +45,7 @@ internal sealed class CommandWriter : IAsyncDisposable
     private readonly ConnectionStatsCounter _counter;
     private readonly Memory<byte> _consolidateMem = new byte[SendMemSize].AsMemory();
     private readonly TimeSpan _defaultCommandTimeout;
+    private readonly TimeSpan _socketWriteTimeout;
     private readonly Action<PingCommand> _enqueuePing;
     private readonly ProtocolWriter _protocolWriter;
     private readonly HeaderWriter _headerWriter;
@@ -74,6 +75,7 @@ internal sealed class CommandWriter : IAsyncDisposable
 
         _counter = counter;
         _defaultCommandTimeout = overrideCommandTimeout ?? opts.CommandTimeout;
+        _socketWriteTimeout = opts.SocketWriteTimeout;
         _enqueuePing = enqueuePing;
         _protocolWriter = new ProtocolWriter(opts.SubjectEncoding);
         _channelLock = Channel.CreateBounded<int>(1);
@@ -102,17 +104,23 @@ internal sealed class CommandWriter : IAsyncDisposable
             _socketConnection = socketConnection;
             _ctsReader = new CancellationTokenSource();
 
+            var writeWatchdog = SocketWriteWatchdog.Create(socketConnection, _socketWriteTimeout, _logger);
+
             _readerLoopTask = Task.Run(async () =>
             {
-                await ReaderLoopAsync(
-                    _logger,
-                    _socketConnection,
-                    _pipeReader,
-                    _channelSize,
-                    _consolidateMem,
-                    _partialSendFailureCounter,
-                    _ctsReader.Token)
-                .ConfigureAwait(false);
+                using (writeWatchdog)
+                {
+                    await ReaderLoopAsync(
+                        _logger,
+                        _socketConnection,
+                        _pipeReader,
+                        _channelSize,
+                        _consolidateMem,
+                        _partialSendFailureCounter,
+                        writeWatchdog,
+                        _ctsReader.Token)
+                    .ConfigureAwait(false);
+                }
             });
         }
     }
@@ -540,6 +548,7 @@ internal sealed class CommandWriter : IAsyncDisposable
         Channel<int> channelSize,
         Memory<byte> consolidateMem,
         PartialSendFailureCounter partialSendFailureCounter,
+        SocketWriteWatchdog? writeWatchdog,
         CancellationToken cancellationToken)
     {
         try
@@ -589,7 +598,15 @@ internal sealed class CommandWriter : IAsyncDisposable
                                 stopwatch.Restart();
                             }
 
-                            sent = await socketConnection.SendAsync(sendMem).ConfigureAwait(false);
+                            writeWatchdog?.WriteStarted();
+                            try
+                            {
+                                sent = await socketConnection.SendAsync(sendMem).ConfigureAwait(false);
+                            }
+                            finally
+                            {
+                                writeWatchdog?.WriteCompleted();
+                            }
 
                             if (trace)
                             {
