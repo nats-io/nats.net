@@ -132,6 +132,11 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
     /// <param name="opts">Subscription options.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> used to cancel the API call.</param>
     public NatsSvcEndpoint(INatsConnection nats, string? queueGroup, string name, Func<NatsSvcMsg<T>, ValueTask> handler, string subject, IDictionary<string, string>? metadata, INatsDeserialize<T> serializer, NatsSubOpts? opts, CancellationToken cancellationToken)
+        : this(nats, queueGroup, name, handler, subject, metadata, serializer, opts, concurrency: 1, cancellationToken)
+    {
+    }
+
+    internal NatsSvcEndpoint(INatsConnection nats, string? queueGroup, string name, Func<NatsSvcMsg<T>, ValueTask> handler, string subject, IDictionary<string, string>? metadata, INatsDeserialize<T> serializer, NatsSubOpts? opts, int concurrency, CancellationToken cancellationToken)
         : base(nats, subject, queueGroup, opts)
     {
         _logger = nats.Opts.LoggerFactory.CreateLogger<NatsSvcEndpoint<T>>();
@@ -148,7 +153,13 @@ public class NatsSvcEndpoint<T> : NatsSvcEndpointBase
             _nats.GetBoundedChannelOpts(opts?.ChannelOpts),
             svcMsg => _nats.OnMessageDropped(this, channel?.Reader.Count ?? 0, svcMsg.Msg));
         _channel = channel;
-        _handlerTask = Task.Run(HandlerLoop);
+
+        // Each handler loop takes the next message from the shared channel, so up to
+        // 'concurrency' messages are handled at the same time. Draining or disposing
+        // completes the channel, and the endpoint waits for every loop to finish.
+        _handlerTask = concurrency == 1
+            ? Task.Run(HandlerLoop)
+            : Task.WhenAll(Enumerable.Range(0, concurrency).Select(_ => Task.Run(HandlerLoop)));
     }
 
     /// <inheritdoc/>
